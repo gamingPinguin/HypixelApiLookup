@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger — Hypixel Skyblock Market Terminal</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#111820; --border:#22303c; --text:#c9d1d9;
+    --dim:#6e7b87; --accent:#58c07d; --bad:#e05252; --hi:#e8b64c;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:"Consolas","SF Mono",monospace;margin:0;font-size:13px}
+  header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+  header h1{font-size:16px;margin:0;color:var(--accent)}
+  header .sub{color:var(--dim);font-size:12px}
+  nav{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .tab{background:none;border:1px solid var(--border);color:var(--dim);padding:6px 14px;cursor:pointer;font-family:inherit;font-size:12px;border-radius:4px}
+  .tab.active{color:var(--accent);border-color:var(--accent)}
+  section{display:none;padding:16px}
+  section.active{display:block}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  input[type=text]{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-family:inherit}
+  button.action{background:var(--accent);color:#04140a;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:bold}
+  button.action:disabled{opacity:.5;cursor:default}
+  .status{color:var(--dim)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--dim);cursor:pointer;user-select:none;font-weight:normal;position:sticky;top:0;background:var(--bg)}
+  th:hover{color:var(--accent)}
+  tbody tr:hover{background:var(--panel)}
+  .craft-row{cursor:pointer}
+  .craft-detail td{text-align:left;color:var(--dim);background:var(--panel)}
+  #snipe-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .snipe-card{border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;background:var(--panel)}
+  .snipe-card:hover{border-color:var(--accent)}
+  .snipe-name{font-weight:bold;margin-bottom:4px}
+  .snipe-price{color:var(--accent)}
+  .snipe-median{color:var(--dim);font-size:11px}
+  .snipe-meta{color:var(--dim);font-size:11px;margin-top:4px}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+  #modal .box{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;max-width:480px;width:90%;max-height:80vh;overflow:auto}
+  #modal .modal-title{font-weight:bold;color:var(--hi);margin-bottom:10px}
+  .modal-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+  .modal-row a{color:var(--accent)}
+  #modal-close{float:right;background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px}
+  .note{color:var(--dim);font-size:11px;margin-top:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LEDGER</h1>
+  <span class="sub">Hypixel Skyblock market terminal — not affiliated with Hypixel Inc.</span>
+</header>
+
+<nav>
+  <button class="tab active" data-tab="tab-bazaar">Bazaar</button>
+  <button class="tab" data-tab="tab-flips">Order Flips</button>
+  <button class="tab" data-tab="tab-craft">Craft Flips</button>
+  <button class="tab" data-tab="tab-snipes">Auction Snipes</button>
+</nav>
+
+<section id="tab-bazaar" class="active">
+  <div class="toolbar">
+    <input type="text" id="bazaar-search" placeholder="filter items...">
+    <span class="status">last updated <span id="bazaar-updated">-</span></span>
+  </div>
+  <table id="bazaar-table">
+    <thead><tr>
+      <th data-key="name">Item</th><th data-key="buyPrice">Buy</th><th data-key="sellPrice">Sell</th>
+      <th data-key="spread">Spread</th><th data-key="spreadPct">Spread %</th><th data-key="volume">7d Volume</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="tab-flips">
+  <div class="toolbar">
+    <input type="text" id="flips-search" placeholder="filter items...">
+    <span class="status">margin is net of the 1.25% bazaar fee</span>
+  </div>
+  <table id="flips-table">
+    <thead><tr>
+      <th data-key="name">Item</th><th data-key="buyAt">Buy order at</th><th data-key="sellAt">Sell order at</th>
+      <th data-key="margin">Margin</th><th data-key="volume">Weekly volume</th><th data-key="score">Flip score</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="tab-craft">
+  <div class="toolbar">
+    <button class="action" id="craft-scan-btn">Scan crafts</button>
+    <input type="text" id="craft-search" placeholder="filter items...">
+    <span class="status" id="craft-status"></span>
+  </div>
+  <table id="craft-table">
+    <thead><tr>
+      <th data-key="name">Item</th><th data-key="cost">Cost</th><th data-key="revenue">Revenue</th>
+      <th data-key="profit">Profit</th><th>Yield</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="note">Recipes are fetched live from the NotEnoughUpdates community repo and cached in localStorage. Only recipes whose ingredients are all bazaar-tradeable are shown.</p>
+</section>
+
+<section id="tab-snipes">
+  <div class="toolbar">
+    <button class="action" id="snipe-scan-btn">Scan auctions</button>
+    <span class="status" id="snipe-status"></span>
+  </div>
+  <div id="snipe-list"></div>
+  <p class="note">A listing is flagged when its variant has at least 4 comparable BIN listings and sits 20%+ below the median of the rest. Pet level banding and gemstone/attribute shard pricing are not yet part of the fingerprint.</p>
+</section>
+
+<div id="modal" hidden>
+  <div class="box">
+    <button id="modal-close">×</button>
+    <div class="modal-title"></div>
+    <div class="modal-body"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const FEE = 0.0125;
+const BAZAAR_URL = 'https://api.hypixel.net/v2/skyblock/bazaar';
+const AUCTIONS_URL = 'https://api.hypixel.net/v2/skyblock/auctions';
+const neuItemUrl = id => `https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/items/${id}.json`;
+
+let bazaar = new Map();
+let bazaarSort = { key: 'volume', dir: -1 };
+let flipSort = { key: 'score', dir: -1 };
+let craftSort = { key: 'profit', dir: -1 };
+let craftResults = [];
+
+// ---------- helpers ----------
+function fmt(n) {
+  if (n == null || isNaN(n)) return '-';
+  const sign = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1e9) return sign + (n / 1e9).toFixed(2) + 'b';
+  if (n >= 1e6) return sign + (n / 1e6).toFixed(2) + 'm';
+  if (n >= 1e3) return sign + (n / 1e3).toFixed(1) + 'k';
+  return sign + n.toFixed(0);
+}
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+function sortRows(rows, key, dir) {
+  return [...rows].sort((a, b) => (a[key] - b[key]) * dir || String(a.name || '').localeCompare(b.name || ''));
+}
+function niceName(id) {
+  return id.replace(/_/g, ' ');
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- sortable table headers ----------
+function wireSort(tableId, stateRef, renderFn) {
+  document.querySelectorAll(`#${tableId} th[data-key]`).forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (stateRef.key === key) stateRef.dir *= -1;
+      else { stateRef.key = key; stateRef.dir = -1; }
+      renderFn();
+    });
+  });
+}
+
+// ---------- bazaar ----------
+async function loadBazaar() {
+  try {
+    const res = await fetch(BAZAAR_URL);
+    const data = await res.json();
+    if (!data.success) throw new Error('bazaar fetch failed');
+    bazaar = new Map(Object.entries(data.products).map(([id, p]) => [id, p.quick_status]));
+    document.getElementById('bazaar-updated').textContent = new Date().toLocaleTimeString();
+    renderBazaar();
+    renderFlips();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('bazaar-updated').textContent = 'fetch failed';
+  }
+}
+setInterval(loadBazaar, 60000);
+
+function renderBazaar() {
+  const q = document.getElementById('bazaar-search').value.toLowerCase();
+  let rows = [...bazaar.entries()].map(([id, s]) => ({
+    id, name: niceName(id),
+    buyPrice: s.buyPrice, sellPrice: s.sellPrice,
+    spread: s.buyPrice - s.sellPrice,
+    spreadPct: s.sellPrice ? (s.buyPrice - s.sellPrice) / s.sellPrice * 100 : 0,
+    volume: s.buyMovingWeek + s.sellMovingWeek,
+  }));
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  rows = sortRows(rows, bazaarSort.key, bazaarSort.dir);
+  document.querySelector('#bazaar-table tbody').innerHTML = rows.map(r => `
+    <tr><td>${r.name}</td><td>${fmt(r.buyPrice)}</td><td>${fmt(r.sellPrice)}</td>
+    <td>${fmt(r.spread)}</td><td>${r.spreadPct.toFixed(2)}%</td><td>${fmt(r.volume)}</td></tr>
+  `).join('');
+}
+document.getElementById('bazaar-search').addEventListener('input', renderBazaar);
+wireSort('bazaar-table', bazaarSort, renderBazaar);
+
+// ---------- order flips ----------
+function renderFlips() {
+  let rows = [...bazaar.entries()].map(([id, s]) => {
+    const margin = s.buyPrice * (1 - FEE) - s.sellPrice;
+    const weeklyVol = Math.min(s.buyMovingWeek, s.sellMovingWeek);
+    return { id, name: niceName(id), buyAt: s.sellPrice, sellAt: s.buyPrice, margin, volume: weeklyVol, score: margin * weeklyVol };
+  }).filter(r => r.margin > 0);
+  const q = document.getElementById('flips-search').value.toLowerCase();
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  rows = sortRows(rows, flipSort.key, flipSort.dir);
+  document.querySelector('#flips-table tbody').innerHTML = rows.slice(0, 300).map(r => `
+    <tr><td>${r.name}</td><td>${fmt(r.buyAt)}</td><td>${fmt(r.sellAt)}</td>
+    <td>${fmt(r.margin)}</td><td>${fmt(r.volume)}</td><td>${fmt(r.score)}</td></tr>
+  `).join('');
+}
+document.getElementById('flips-search').addEventListener('input', renderFlips);
+wireSort('flips-table', flipSort, renderFlips);
+
+// ---------- craft flips ----------
+// ponytail: recipes are fetched live from the NEU repo (cached in localStorage) instead of
+// hand-embedding 200+ recipes at build time. Same "no server" constraint, far less code,
+// and no risk of shipping a fabricated recipe. Swap for a bundled dataset if offline use matters.
+const recipeCache = new Map();
+async function getRecipe(id) {
+  if (recipeCache.has(id)) return recipeCache.get(id);
+  const lsKey = 'ledger_recipe_' + id;
+  const cached = localStorage.getItem(lsKey);
+  if (cached !== null) {
+    const val = cached === 'null' ? null : JSON.parse(cached);
+    recipeCache.set(id, val);
+    return val;
+  }
+  let recipe = null;
+  try {
+    const res = await fetch(neuItemUrl(id));
+    if (res.ok) {
+      const data = await res.json();
+      recipe = data.recipe || null;
+    }
+  } catch (e) { /* treated as no recipe */ }
+  localStorage.setItem(lsKey, JSON.stringify(recipe));
+  recipeCache.set(id, recipe);
+  return recipe;
+}
+function parseRecipeSlot(v) {
+  if (!v) return null;
+  const [id, amt] = String(v).split(':');
+  if (!id || id === 'null') return null;
+  return { id, amount: amt ? parseInt(amt, 10) : 1 };
+}
+const RECIPE_SLOTS = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
+
+async function scanCraftFlips() {
+  const btn = document.getElementById('craft-scan-btn');
+  const status = document.getElementById('craft-status');
+  btn.disabled = true;
+  const ids = [...bazaar.keys()];
+  const results = [];
+  let done = 0, idx = 0;
+  async function worker() {
+    while (idx < ids.length) {
+      const id = ids[idx++];
+      const recipe = await getRecipe(id);
+      done++;
+      if (done % 10 === 0) status.textContent = `scanning ${done}/${ids.length}`;
+      if (!recipe) continue;
+      const slots = RECIPE_SLOTS.map(k => parseRecipeSlot(recipe[k])).filter(Boolean);
+      if (!slots.length || !slots.every(s => bazaar.has(s.id))) continue;
+      const outCount = parseInt(recipe.count || '1', 10) || 1;
+      const outQ = bazaar.get(id);
+      const cost = slots.reduce((sum, s) => sum + bazaar.get(s.id).buyPrice * s.amount, 0);
+      const revenue = outQ.sellPrice * outCount * (1 - FEE);
+      const profit = revenue - cost;
+      if (profit > 0) results.push({ id, name: niceName(id), cost, revenue, profit, outCount, slots });
+    }
+  }
+  await Promise.all(Array.from({ length: 10 }, worker));
+  craftResults = results;
+  status.textContent = `${results.length} profitable crafts out of ${ids.length} bazaar items scanned`;
+  btn.disabled = false;
+  renderCraft();
+}
+document.getElementById('craft-scan-btn').addEventListener('click', scanCraftFlips);
+document.getElementById('craft-search').addEventListener('input', renderCraft);
+wireSort('craft-table', craftSort, renderCraft);
+
+function renderCraft() {
+  let rows = [...craftResults];
+  const q = document.getElementById('craft-search').value.toLowerCase();
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  rows = sortRows(rows, craftSort.key, craftSort.dir);
+  document.querySelector('#craft-table tbody').innerHTML = rows.map((r, i) => `
+    <tr class="craft-row" data-i="${i}"><td>${r.name}</td><td>${fmt(r.cost)}</td><td>${fmt(r.revenue)}</td><td>${fmt(r.profit)}</td><td>x${r.outCount}</td></tr>
+    <tr class="craft-detail" data-i="${i}" hidden><td colspan="5">${r.slots.map(s => `${s.amount}x ${niceName(s.id)} @ ${fmt(bazaar.get(s.id).buyPrice)}`).join('<br>')}</td></tr>
+  `).join('');
+  document.querySelectorAll('.craft-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const detail = document.querySelector(`.craft-detail[data-i="${tr.dataset.i}"]`);
+      detail.hidden = !detail.hidden;
+    });
+  });
+}
+
+// ---------- NBT + gzip (native platform decompression, no library) ----------
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function gunzip(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+class Cursor { constructor(view) { this.view = view; this.pos = 0; } }
+const readByte = c => { const v = c.view.getInt8(c.pos); c.pos += 1; return v; };
+const readUByte = c => { const v = c.view.getUint8(c.pos); c.pos += 1; return v; };
+const readShort = c => { const v = c.view.getInt16(c.pos); c.pos += 2; return v; };
+const readInt = c => { const v = c.view.getInt32(c.pos); c.pos += 4; return v; };
+const readLong = c => { const v = c.view.getBigInt64(c.pos); c.pos += 8; return Number(v); };
+const readFloat = c => { const v = c.view.getFloat32(c.pos); c.pos += 4; return v; };
+const readDouble = c => { const v = c.view.getFloat64(c.pos); c.pos += 8; return v; };
+function readString(c) {
+  const len = readShort(c) & 0xffff;
+  const bytes = new Uint8Array(c.view.buffer, c.view.byteOffset + c.pos, len);
+  c.pos += len;
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function readPayload(c, type) {
+  switch (type) {
+    case 1: return readByte(c);
+    case 2: return readShort(c);
+    case 3: return readInt(c);
+    case 4: return readLong(c);
+    case 5: return readFloat(c);
+    case 6: return readDouble(c);
+    case 7: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readByte(c)); return a; }
+    case 8: return readString(c);
+    case 9: { const t = readUByte(c); const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readPayload(c, t)); return a; }
+    case 10: { const o = {}; while (true) { const t = readUByte(c); if (t === 0) break; o[readString(c)] = readPayload(c, t); } return o; }
+    case 11: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readInt(c)); return a; }
+    case 12: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readLong(c)); return a; }
+    default: throw new Error('unknown NBT tag type ' + type);
+  }
+}
+function parseNbt(bytes) {
+  const c = new Cursor(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  const rootType = readUByte(c);
+  readString(c); // root name, unused
+  return readPayload(c, rootType);
+}
+async function decodeItemBytes(b64) {
+  const raw = await gunzip(b64ToBytes(b64));
+  const nbt = parseNbt(raw);
+  return nbt.i || [];
+}
+
+// ---------- fingerprint ----------
+// ponytail: pet level is grouped by tier only, not the full 20-level band from the spec.
+// The XP breakpoint table needed for exact bands is large; add it if pet snipes need finer grouping.
+function fingerprint(itemId, ea) {
+  const parts = [itemId || 'UNKNOWN'];
+  if (!ea) return parts.join('|');
+  if (ea.rarity_upgrades) parts.push('R');
+  const stars = ea.upgrade_level || ea.dungeon_item_level;
+  if (stars) parts.push('S' + stars);
+  const hpb = ea.hot_potato_count;
+  if (hpb && hpb > 10) parts.push('FPB' + (hpb - 10));
+  if (ea.enchantments) {
+    const ench = Object.entries(ea.enchantments)
+      .filter(([name, lvl]) => name.startsWith('ultimate_') || lvl >= 6)
+      .map(([name, lvl]) => `${name}${lvl}`)
+      .sort();
+    if (ench.length) parts.push(ench.join(','));
+  }
+  if (itemId === 'PET' && ea.petInfo) {
+    try {
+      const p = JSON.parse(ea.petInfo);
+      parts.push(`PET:${p.type}:${p.tier}:${p.heldItem || ''}`);
+    } catch (e) { /* malformed petInfo, skip pet-specific grouping */ }
+  }
+  if (ea.new_years_cake) parts.push('CAKE' + ea.new_years_cake);
+  if (ea.party_hat_color) parts.push('HAT' + ea.party_hat_color + (ea.party_hat_emoji || ''));
+  return parts.join('|');
+}
+
+function findSnipes(groups) {
+  const snipes = [];
+  for (const listings of groups.values()) {
+    if (listings.length < 4) continue;
+    const sorted = [...listings].sort((a, b) => a.price - b.price);
+    const cheapest = sorted[0];
+    const med = median(sorted.slice(1).map(l => l.price));
+    const gap = sorted[1].price - cheapest.price;
+    if (cheapest.price <= med * 0.8 && gap > 0) {
+      snipes.push({ cheapest, median: med, listings: sorted });
+    }
+  }
+  return snipes.sort((a, b) => (b.median - b.cheapest.price) - (a.median - a.cheapest.price));
+}
+
+// ---------- auction scan ----------
+async function scanSnipes() {
+  const btn = document.getElementById('snipe-scan-btn');
+  const status = document.getElementById('snipe-status');
+  btn.disabled = true;
+  try {
+    status.textContent = 'fetching page 0...';
+    const first = await (await fetch(AUCTIONS_URL + '?page=0')).json();
+    const totalPages = first.totalPages;
+    const allBin = first.auctions.filter(a => a.bin);
+    const rest = [];
+    for (let p = 1; p < totalPages; p++) rest.push(fetch(`${AUCTIONS_URL}?page=${p}`).then(r => r.json()));
+    let fetched = 1;
+    for (const pr of rest) {
+      const data = await pr;
+      allBin.push(...data.auctions.filter(a => a.bin));
+      fetched++;
+      status.textContent = `fetched ${fetched}/${totalPages} pages, ${allBin.length} BIN listings`;
+    }
+
+    status.textContent = `decoding ${allBin.length} listings...`;
+    const groups = new Map();
+    let decoded = 0, idx = 0;
+    async function worker() {
+      while (idx < allBin.length) {
+        const auction = allBin[idx++];
+        try {
+          const items = await decodeItemBytes(auction.item_bytes);
+          const ea = items[0]?.tag?.ExtraAttributes;
+          const itemId = ea?.id || auction.item_name;
+          const fp = fingerprint(itemId, ea);
+          if (!groups.has(fp)) groups.set(fp, []);
+          groups.get(fp).push({ price: auction.starting_bid, uuid: auction.uuid, auctioneer: auction.auctioneer, itemName: auction.item_name });
+        } catch (e) { /* malformed item_bytes, skip this listing */ }
+        decoded++;
+        if (decoded % 200 === 0) status.textContent = `decoded ${decoded}/${allBin.length}`;
+      }
+    }
+    await Promise.all(Array.from({ length: 25 }, worker));
+
+    const snipes = findSnipes(groups);
+    status.textContent = `${snipes.length} snipes found from ${allBin.length} BIN listings`;
+    renderSnipes(snipes);
+  } catch (e) {
+    console.error(e);
+    status.textContent = 'scan failed: ' + e.message;
+  }
+  btn.disabled = false;
+}
+document.getElementById('snipe-scan-btn').addEventListener('click', scanSnipes);
+
+function renderSnipes(snipes) {
+  const list = document.getElementById('snipe-list');
+  list.innerHTML = snipes.slice(0, 150).map((s, i) => `
+    <div class="snipe-card" data-i="${i}">
+      <div class="snipe-name">${s.cheapest.itemName}</div>
+      <div class="snipe-price">${fmt(s.cheapest.price)} <span class="snipe-median">median ${fmt(s.median)}</span></div>
+      <div class="snipe-meta">${s.listings.length} listings</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('.snipe-card').forEach(card => {
+    card.addEventListener('click', () => openSnipeDetail(snipes[+card.dataset.i]));
+  });
+}
+function openSnipeDetail(s) {
+  const modal = document.getElementById('modal');
+  modal.querySelector('.modal-title').textContent = s.cheapest.itemName;
+  modal.querySelector('.modal-body').innerHTML = s.listings.map(l => `
+    <div class="modal-row"><span>${fmt(l.price)}</span> <a href="https://sky.shiiyu.moe/stats/${l.auctioneer}" target="_blank" rel="noopener">seller</a></div>
+  `).join('');
+  modal.hidden = false;
+}
+document.getElementById('modal-close').addEventListener('click', () => { document.getElementById('modal').hidden = true; });
+document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') e.currentTarget.hidden = true; });
+
+// ---------- self-test ----------
+// smallest runnable check for the two non-trivial pieces of logic: the NBT parser and fingerprinting.
+function selfTest() {
+  const bytes = new Uint8Array([10, 0, 0, 3, 0, 1, 97, 0, 0, 0, 5, 0]); // {"a": 5} as TAG_Compound
+  console.assert(parseNbt(bytes).a === 5, 'NBT parser self-test failed');
+  console.assert(fingerprint('HYPERION', {}) === 'HYPERION', 'fingerprint base case failed');
+  console.assert(fingerprint('HYPERION', { hot_potato_count: 15 }).includes('FPB5'), 'fingerprint FPB case failed');
+  const margin = 100 * (1 - FEE) - 90;
+  console.assert(Math.abs(margin - 8.75) < 0.001, 'margin calc self-test failed');
+}
+selfTest();
+
+loadBazaar();
+</script>
+</body>
+</html>
