@@ -2,7 +2,7 @@
 
 A market data terminal for Hypixel Skyblock. Ledger tracks bazaar prices, surfaces profitable order flips and craft flips, and scans the auction house for underpriced listings using true item attributes rather than display names.
 
-The current release runs entirely in the browser as a single HTML file. A planned second phase adds a small backend service that records sale history, a capability the public Hypixel API does not provide on its own.
+The browser release runs as a single HTML file with no build step. A small containerized backend records sale history, a capability the public Hypixel API does not provide on its own.
 
 ---
 
@@ -12,11 +12,14 @@ The current release runs entirely in the browser as a single HTML file. A planne
 2. [Features](#features)
 3. [How it works](#how-it-works)
 4. [Running the browser version](#running-the-browser-version)
-5. [Data sources](#data-sources)
-6. [Accuracy and known limits](#accuracy-and-known-limits)
-7. [Planned backend service](#planned-backend-service)
-8. [Roadmap](#roadmap)
-9. [Project layout](#project-layout)
+5. [Running the backend](#running-the-backend)
+6. [Data sources](#data-sources)
+7. [Accuracy and known limits](#accuracy-and-known-limits)
+8. [Backend service](#backend-service)
+9. [Roadmap](#roadmap)
+10. [Design direction](#design-direction)
+11. [References](#references)
+12. [Project layout](#project-layout)
 
 ---
 
@@ -26,9 +29,10 @@ The current release runs entirely in the browser as a single HTML file. A planne
 |:----------|:------|:------|
 | Bazaar viewer | Shipped | Live order book, sortable |
 | Order flip finder | Shipped | Margin net of fees, volume weighted |
-| Craft flip finder | Shipped | 213 recipes embedded, priced live |
+| Craft flip finder | Shipped | Recipes fetched live from the NEU repo, cached in the browser |
 | Auction snipe scanner | Shipped | Attribute aware, decodes item NBT |
-| Sale history graph | Planned | Requires the backend service |
+| Backend collector and API | Shipped | Records BIN sales, containerized, `/api/history` endpoint |
+| Sale history graph | Planned | Backend records the data; no chart in the browser yet |
 | Seller name resolution | Planned | Requires server side lookup |
 
 ---
@@ -58,24 +62,25 @@ The scanner pulls every active Buy It Now listing, decodes each item's binary at
 - Stars and master stars
 - Fuming potato books beyond the standard ten hot potato books
 - Enchantments at level six or above, plus all ultimate enchantments
-- Pet type, tier, and level band, plus whether the pet holds an item
+- Pet type, tier, and whether the pet holds an item
 - New Year Cake year and party hat variants
 
 Reforges are deliberately excluded, since they are cheap to reapply and do not meaningfully change an item's resale value.
 
-A listing is flagged as a snipe only when its variant has at least four comparable listings, the price sits at least twenty percent below the median of the other listings, and there is a real coin gap above the next cheapest listing. Selecting a snipe opens a detail panel showing the item's in game tooltip, a price breakdown of every listing for that variant, and a link to each seller's profile.
+A listing is flagged as a snipe only when its variant has at least four comparable listings, the price sits at least twenty percent below the median of the other listings, and there is a real coin gap above the next cheapest listing. Selecting a snipe opens a detail panel showing a price breakdown of every listing for that variant and a link to each seller's profile.
 
 ---
 
 ## How it works
 
-The browser version is a single self contained HTML file. There is no build step and no server. Open it and it runs.
+The browser version is a single self contained HTML file. There is no build step and no server required to use it standalone.
 
 ```
 Browser (Ledger single file)
   |
   |-- fetch bazaar          --> Hypixel API  (refreshed every 60s)
   |-- fetch auction pages   --> Hypixel API  (on demand scan)
+  |-- fetch recipes         --> NEU repo     (on demand, cached in localStorage)
   |
   |-- decode item_bytes     --> gzip + base64 + NBT parse, in browser
   |-- fingerprint items     --> attribute based grouping
@@ -84,11 +89,9 @@ Browser (Ledger single file)
   '-- render tables and detail panels
 ```
 
-Recipe data and item display names are embedded directly in the file at build time, so the app has no runtime dependency on any recipe service. The only live calls are to the public Hypixel endpoints.
-
 ### Item attribute decoding
 
-Every auction carries an `item_bytes` field containing the item's full attribute set as gzip compressed, base64 encoded named binary tag data. Ledger decompresses this in the browser, walks the tag tree, and reads the `ExtraAttributes` block. This is what allows a clean item to be told apart from a maxed one that happens to share a display name.
+Every auction carries an `item_bytes` field containing the item's full attribute set as gzip compressed, base64 encoded named binary tag data. Ledger decompresses this in the browser, walks the tag tree, and reads the `ExtraAttributes` block. This is what allows a clean item to be told apart from a maxed one that happens to share a display name. The backend collector decodes the same format in Python so both sides group auctions into identical variants.
 
 ---
 
@@ -97,9 +100,19 @@ Every auction carries an `item_bytes` field containing the item's full attribute
 1. Download `ledger.html`.
 2. Open it in any modern browser.
 
-That is the whole process. For live reload during development, the VS Code Live Server extension works well, though it is not required.
+That is the whole process. No API key is needed. The bazaar and auction endpoints used here are public and cached upstream, so they do not require authentication.
 
-No API key is needed. The bazaar and auction endpoints used here are public and cached upstream, so they do not require authentication.
+---
+
+## Running the backend
+
+```
+cd backend
+docker compose build
+docker compose up
+```
+
+The page and the history API are both served on port 8080. Data lives in a named Docker volume, so it survives container restarts. Run the self-tests with `python backend/test_ledger.py` before building if you've changed the collector or parser.
 
 ---
 
@@ -109,7 +122,7 @@ No API key is needed. The bazaar and auction endpoints used here are public and 
 |:-------|:----|:---------------|
 | Hypixel bazaar endpoint | Live product prices and volume | None |
 | Hypixel auctions endpoint | Active Buy It Now listings | None |
-| NotEnoughUpdates repository | Crafting recipes and item names | Embedded at build time |
+| NotEnoughUpdates repository | Crafting recipes | None, fetched live and cached |
 | SkyCrypt | Seller profile links | None, opened in a new tab |
 
 The Hypixel endpoints are cached on Hypixel's side and refresh roughly once per minute. Requesting them more often than that returns identical data, so the refresh interval is set to sixty seconds to match.
@@ -124,15 +137,15 @@ Specific limits worth understanding:
 
 **Craft flips** only cover recipes where every ingredient trades on the bazaar. Recipes that require auction only items, non tradeable items, or NPC purchases are excluded. Profit assumes ingredients are bought at instant buy, so patient buy orders will do better than the figures shown.
 
-**Snipe fingerprints** do not yet account for gemstone slots, attribute shards, or dungeon drill components. Each of these carries its own value and would need its own pricing table. Pet levels are grouped into bands twenty levels wide, so two pets in the same band are treated as equivalent even when their exact levels differ.
+**Snipe fingerprints** do not yet account for gemstone slots, attribute shards, or dungeon drill components. Each of these carries its own value and would need its own pricing table. Pets are grouped by type and tier only, not by exact level, so two pets of the same tier are treated as equivalent even when their levels differ.
 
-**Sale detection is not available in the browser version.** The Hypixel API exposes only active auctions. Once an auction sells or expires it leaves the API, so the browser cannot know whether a given item is actually selling or merely being listed. This is the primary motivation for the planned backend service.
+**Sale detection is a heuristic, not a certainty.** The Hypixel API exposes only active auctions. The backend infers a sale by comparing consecutive snapshots: a listing that vanishes well before its stated end time was bought, one that vanishes at or after its end time expired. An item purchased in the final moments before expiry can be misclassified, though this matches the approach used by established community trackers and is accurate in the large majority of cases.
 
 ---
 
-## Planned backend service
+## Backend service
 
-The public API has no sale history endpoint. To provide history, Ledger needs a process that runs continuously and records what it observes over time. That process cannot live in a browser tab, so this phase introduces a small containerized service.
+The public API has no sale history endpoint. To provide history, Ledger runs a process that polls continuously and records what it observes over time. That process cannot live in a browser tab, so it runs as a small containerized service instead.
 
 ### Architecture
 
@@ -159,11 +172,9 @@ The public API has no sale history endpoint. To provide history, Ledger needs a 
 
 The collector infers sales by comparing consecutive snapshots of the active auction set.
 
-When an auction listing is present in one snapshot and absent in the next, one of two things happened. Either the item sold, or the listing timer expired and the item returned to its seller. The two cases are separated by comparing the listing's stated end time against the moment it disappeared. A listing that vanishes well before its end time was bought. A listing that vanishes at or after its end time expired.
+When an auction listing is present in one snapshot and absent in the next, one of two things happened. Either the item sold, or the listing timer expired and the item returned to its seller. The two cases are separated by comparing the listing's stated end time against the moment it disappeared, with a slack window around the 60 second poll interval.
 
-This heuristic is not perfect, since an item can be purchased in the final moments before expiry, but it matches the approach used by established community trackers and is accurate in the large majority of cases.
-
-### Proposed schema
+### Schema
 
 ```sql
 CREATE TABLE sales (
@@ -186,7 +197,7 @@ CREATE TABLE active (
 );
 ```
 
-On each poll the collector loads the known active set from the database, fetches the current set from the API, and reconciles the two. New identifiers are inserted. Identifiers still present have their last seen time updated. Identifiers that are now missing are classified as sold or expired and handled accordingly.
+On each poll the collector loads the known active set from the database, fetches the current set from the API, and reconciles the two. New identifiers are inserted. Identifiers still present have their last seen time updated. Identifiers that are now missing are classified as sold or expired and handled accordingly. A failed or partial fetch skips the whole reconcile cycle rather than risk marking every active listing as sold.
 
 ### What the backend unlocks
 
@@ -199,31 +210,97 @@ On each poll the collector loads the known active set from the database, fetches
 
 ## Roadmap
 
-| Phase | Goal |
-|:------|:-----|
-| 1 | Browser terminal with bazaar, flips, crafts, and snipes. Complete. |
-| 2 | Containerized collector and database for sale detection. |
-| 3 | Sale history charts per item variant in the detail panel. |
-| 4 | Full listing search, so any item can be looked up directly rather than only flagged deals. |
-| 5 | Server side seller name resolution and caching. |
-| 6 | Extended snipe fingerprint covering gemstones and other value bearing attributes. |
+The four tabs shipped today cover the core liquid strategies, and the backend now records sale history even though nothing in the browser reads it yet. The list below is the fuller catalog of flip types the project aims toward, modeled on the range offered by SkyCofl. Each is a distinct market with its own data needs, so they are staged by how much new infrastructure they require.
+
+### Shipped
+
+| Feature | Description |
+|:--------|:------------|
+| Bazaar viewer | Live order book across all products |
+| Order flips | Buy order to sell offer, net of fees, volume weighted |
+| Craft flips | Buy ingredients, craft, sell, ranked by profit |
+| Auction snipes | Attribute aware underpriced listing detection |
+| Backend collector and history API | Sale detection, SQLite storage, `/api/history` endpoint |
+
+### Planned, browser only
+
+These need no backend, only more logic in the existing file.
+
+| Feature | Description |
+|:--------|:------------|
+| Full listing search | Look up any item and see every live listing, not only flagged deals |
+| Top margins by coins | Highest absolute profit gap across the bazaar |
+| Top margins by percent | Highest percentage profit gap |
+| Top demand | Items ranked by sell volume |
+| NPC flips | Buy from a vendor, sell to the bazaar or auction house |
+| Reverse NPC flips | Buy below vendor value from players, sell to the vendor |
+| Book flips | Combine enchantment books to a higher level and resell |
+
+### Planned, backend required
+
+These depend on the collector recording data over time.
+
+| Feature | Description |
+|:--------|:------------|
+| Sale history charts | Per variant price history, so you can see whether an item actually sells |
+| Top movers | Largest 24 hour price swings, up and down |
+| Low supply research | Thin markets flagged before you chase a niche item |
+| Seller name resolution | Server side Mojang lookups, cached |
+| Mayor flips | Event driven predictions based on historic mayor term pricing |
+| Kat flips | Profitable pet upgrades through the Kat NPC |
+| Forge flips | Dwarven forge recipes with cooldown tracking |
+| Attribute and fusion flips | Shard combination opportunities |
+
+---
+
+## Design direction
+
+Ledger's interface aims for a calm, corporate market terminal look rather than a gaming aesthetic. The reference points below define the target.
+
+### Layout and typography
+
+The page structure follows the pattern of Bazaar Tracker: a slim top navigation bar, a headline summary row of a few large stat figures, then dense sortable data tables grouped into clearly labeled sections. Each section leads with a one line description of what the numbers mean.
+
+Typography stays in a single clean sans serif family with tabular figures, so columns of numbers align. Color is used sparingly and only to carry meaning, green for gain, red for loss, one accent for interactive elements. There are no gradients, textures, or decorative flourishes.
+
+### Iconography
+
+Item and category icons follow the flat, evenly weighted style used by skyblock.finance, where each icon reads clearly at small sizes and shares a consistent visual weight with its neighbors. Icons support the data rather than competing with it. Not yet implemented in the browser file; it needs an icon asset source, see the note in Roadmap.
+
+### Principles
+
+- Numbers are the interface. Everything else stays quiet.
+- One accent color, used only for links and active states.
+- Consistent icon weight across every row.
+- A section is never shown without a plain language note on how to read it.
+
+---
+
+## References
+
+The project draws on three existing tools. They are listed here as design and feature references, not as dependencies.
+
+| Reference | Used for |
+|:----------|:---------|
+| [SkyCofl flipping hub](https://sky.coflnet.com/flips) | The catalog of flip types and how each market is framed by capital, risk, and liquidity |
+| [Bazaar Tracker](https://bazaartracker.com) | Page layout, section structure, typography, and the summary stat row pattern |
+| [skyblock.finance](https://skyblock.finance/) | Icon style, flat and evenly weighted at small sizes |
 
 ---
 
 ## Project layout
-
-The browser release is a single file. The planned backend introduces a small set of additional files.
 
 ```
 ledger/
   ledger.html            Browser terminal, self contained
   README.md              This document
 
-  backend/               Planned, phase 2 onward
+  backend/
     collector.py         Polls the API and records sales
-    server.py            Serves the page and history endpoints
-    schema.sql           Database definition
-    requirements.txt     Python dependencies
+    server.py             Serves the page and history endpoints
+    nbt.py                Shared gzip/NBT decoding and fingerprinting
+    schema.sql            Database definition
+    test_ledger.py        Self-tests for the parser and sale/expiry logic
     Dockerfile
     docker-compose.yml
 ```

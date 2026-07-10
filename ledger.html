@@ -5,42 +5,53 @@
 <title>Ledger — Hypixel Skyblock Market Terminal</title>
 <style>
   :root{
-    --bg:#0d1117; --panel:#111820; --border:#22303c; --text:#c9d1d9;
-    --dim:#6e7b87; --accent:#58c07d; --bad:#e05252; --hi:#e8b64c;
+    --bg:#0b0e12; --panel:#12161c; --border:#232a33; --text:#d3d9e0;
+    --dim:#7a8592; --accent:#4fae74; --bad:#d0685f; --hi:#c9a24b;
   }
   *{box-sizing:border-box}
-  body{background:var(--bg);color:var(--text);font-family:"Consolas","SF Mono",monospace;margin:0;font-size:13px}
-  header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
-  header h1{font-size:16px;margin:0;color:var(--accent)}
+  body{
+    background:var(--bg);color:var(--text);margin:0;font-size:13px;
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  td,.num,.stat-value{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  header{display:flex;align-items:baseline;gap:14px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+  header h1{font-size:15px;margin:0;letter-spacing:.06em;color:var(--text);font-weight:700}
   header .sub{color:var(--dim);font-size:12px}
-  nav{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
-  .tab{background:none;border:1px solid var(--border);color:var(--dim);padding:6px 14px;cursor:pointer;font-family:inherit;font-size:12px;border-radius:4px}
-  .tab.active{color:var(--accent);border-color:var(--accent)}
-  section{display:none;padding:16px}
+  nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);padding:10px 14px;cursor:pointer;font:inherit;font-size:12.5px}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+  .tab:hover{color:var(--text)}
+  #summary{display:flex;gap:32px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat-value{font-size:20px;font-weight:700;color:var(--text)}
+  .stat-label{font-size:11px;color:var(--dim)}
+  section{display:none;padding:20px}
   section.active{display:block}
+  .section-note{color:var(--dim);font-size:12px;margin:0 0 14px}
   .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
-  input[type=text]{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-family:inherit}
-  button.action{background:var(--accent);color:#04140a;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:bold}
+  input[type=text]{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font:inherit}
+  button.action{background:var(--accent);color:#06150c;border:none;padding:7px 16px;border-radius:4px;cursor:pointer;font:inherit;font-weight:600}
   button.action:disabled{opacity:.5;cursor:default}
   .status{color:var(--dim)}
   table{width:100%;border-collapse:collapse}
-  th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
-  th{color:var(--dim);cursor:pointer;user-select:none;font-weight:normal;position:sticky;top:0;background:var(--bg)}
-  th:hover{color:var(--accent)}
+  th{color:var(--dim);cursor:pointer;user-select:none;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--bg)}
+  th:hover{color:var(--text)}
   tbody tr:hover{background:var(--panel)}
   .craft-row{cursor:pointer}
   .craft-detail td{text-align:left;color:var(--dim);background:var(--panel)}
   #snipe-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
   .snipe-card{border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;background:var(--panel)}
   .snipe-card:hover{border-color:var(--accent)}
-  .snipe-name{font-weight:bold;margin-bottom:4px}
-  .snipe-price{color:var(--accent)}
+  .snipe-name{font-weight:600;margin-bottom:4px}
+  .snipe-price{color:var(--accent);font-variant-numeric:tabular-nums}
   .snipe-median{color:var(--dim);font-size:11px}
   .snipe-meta{color:var(--dim);font-size:11px;margin-top:4px}
-  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+  #modal{position:fixed;inset:0}
+  #modal:not([hidden]){background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
   #modal .box{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;max-width:480px;width:90%;max-height:80vh;overflow:auto}
-  #modal .modal-title{font-weight:bold;color:var(--hi);margin-bottom:10px}
+  #modal .modal-title{font-weight:600;color:var(--hi);margin-bottom:10px}
   .modal-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
   .modal-row a{color:var(--accent)}
   #modal-close{float:right;background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px}
@@ -61,7 +72,15 @@
   <button class="tab" data-tab="tab-snipes">Auction Snipes</button>
 </nav>
 
+<div id="summary">
+  <div class="stat"><span class="stat-value" id="stat-products">-</span><span class="stat-label">Bazaar products</span></div>
+  <div class="stat"><span class="stat-value" id="stat-flips">-</span><span class="stat-label">Profitable order flips</span></div>
+  <div class="stat"><span class="stat-value" id="stat-best-score">-</span><span class="stat-label">Best flip score</span></div>
+  <div class="stat"><span class="stat-value" id="stat-crafts">-</span><span class="stat-label">Profitable crafts</span></div>
+</div>
+
 <section id="tab-bazaar" class="active">
+  <p class="section-note">Every bazaar product, refreshed every 60 seconds. Buy and sell are the current instant-fill prices; volume is coins traded over the last 7 days.</p>
   <div class="toolbar">
     <input type="text" id="bazaar-search" placeholder="filter items...">
     <span class="status">last updated <span id="bazaar-updated">-</span></span>
@@ -76,9 +95,10 @@
 </section>
 
 <section id="tab-flips">
+  <p class="section-note">Buy order at the low price, resell with a sell order at the high price. Margin is net of the 1.25% bazaar fee. Flip Score weights margin by weekly volume so illiquid items sort to the bottom.</p>
   <div class="toolbar">
     <input type="text" id="flips-search" placeholder="filter items...">
-    <span class="status">margin is net of the 1.25% bazaar fee</span>
+    <span class="status">sorted by flip score</span>
   </div>
   <table id="flips-table">
     <thead><tr>
@@ -90,6 +110,7 @@
 </section>
 
 <section id="tab-craft">
+  <p class="section-note">Cost is the bazaar buy price of every ingredient; revenue is the crafted item's bazaar sell price net of fees. Only recipes where every ingredient trades on the bazaar are shown.</p>
   <div class="toolbar">
     <button class="action" id="craft-scan-btn">Scan crafts</button>
     <input type="text" id="craft-search" placeholder="filter items...">
@@ -102,16 +123,17 @@
     </tr></thead>
     <tbody></tbody>
   </table>
-  <p class="note">Recipes are fetched live from the NotEnoughUpdates community repo and cached in localStorage. Only recipes whose ingredients are all bazaar-tradeable are shown.</p>
+  <p class="note">Recipes are fetched live from the NotEnoughUpdates community repo and cached in localStorage.</p>
 </section>
 
 <section id="tab-snipes">
+  <p class="section-note">Every active Buy It Now listing, grouped by true item attributes rather than display name. A listing is flagged when its variant has at least 4 comparable listings and sits 20%+ below the median of the rest.</p>
   <div class="toolbar">
     <button class="action" id="snipe-scan-btn">Scan auctions</button>
     <span class="status" id="snipe-status"></span>
   </div>
   <div id="snipe-list"></div>
-  <p class="note">A listing is flagged when its variant has at least 4 comparable BIN listings and sits 20%+ below the median of the rest. Pet level banding and gemstone/attribute shard pricing are not yet part of the fingerprint.</p>
+  <p class="note">Pet level banding and gemstone/attribute shard pricing are not yet part of the fingerprint.</p>
 </section>
 
 <div id="modal" hidden>
@@ -190,6 +212,7 @@ async function loadBazaar() {
     document.getElementById('bazaar-updated').textContent = new Date().toLocaleTimeString();
     renderBazaar();
     renderFlips();
+    updateSummary();
   } catch (e) {
     console.error(e);
     document.getElementById('bazaar-updated').textContent = 'fetch failed';
@@ -233,6 +256,22 @@ function renderFlips() {
 }
 document.getElementById('flips-search').addEventListener('input', renderFlips);
 wireSort('flips-table', flipSort, renderFlips);
+
+// ---------- headline summary ----------
+function updateSummary() {
+  document.getElementById('stat-products').textContent = bazaar.size;
+  let flipCount = 0, bestScore = 0;
+  for (const s of bazaar.values()) {
+    const margin = s.buyPrice * (1 - FEE) - s.sellPrice;
+    if (margin <= 0) continue;
+    flipCount++;
+    const score = margin * Math.min(s.buyMovingWeek, s.sellMovingWeek);
+    if (score > bestScore) bestScore = score;
+  }
+  document.getElementById('stat-flips').textContent = flipCount;
+  document.getElementById('stat-best-score').textContent = fmt(bestScore);
+  document.getElementById('stat-crafts').textContent = craftResults.length;
+}
 
 // ---------- craft flips ----------
 // ponytail: recipes are fetched live from the NEU repo (cached in localStorage) instead of
@@ -297,6 +336,7 @@ async function scanCraftFlips() {
   status.textContent = `${results.length} profitable crafts out of ${ids.length} bazaar items scanned`;
   btn.disabled = false;
   renderCraft();
+  updateSummary();
 }
 document.getElementById('craft-scan-btn').addEventListener('click', scanCraftFlips);
 document.getElementById('craft-search').addEventListener('input', renderCraft);
