@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY index.html ledger.html item.html privacy.html ledger-core.js ./
+COPY index.html bazaar-tracker.html auction-tracker.html flips.html privacy.html ./
+COPY src/ ./src/
 COPY backend/ ./backend/
 RUN mkdir -p /data
 
