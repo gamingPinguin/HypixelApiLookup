@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY ledger.html ./
+COPY index.html ledger.html item.html privacy.html ledger-core.js ./
 COPY backend/ ./backend/
 RUN mkdir -p /data
 

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger — Hypixel Skyblock Market Terminal</title>
+<meta name="description" content="Ledger tracks Hypixel Skyblock bazaar prices, order and craft flips, and scans the auction house for underpriced listings using true item attributes.">
+<style>
+  :root{
+    --bg:#0b0e12; --panel:#12161c; --border:#232a33; --text:#d3d9e0;
+    --dim:#7a8592; --accent:#4fae74; --hi:#c9a24b;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);margin:0;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border)}
+  header h1{font-size:15px;margin:0;letter-spacing:.06em;font-weight:700}
+  header nav{margin-left:auto;display:flex;gap:20px}
+  header nav a{color:var(--dim);text-decoration:none;font-size:13px}
+  header nav a:hover{color:var(--text)}
+  .hero{max-width:720px;margin:0 auto;padding:80px 24px 40px;text-align:center}
+  .hero h2{font-size:34px;margin:0 0 16px;letter-spacing:-.01em}
+  .hero p{color:var(--dim);font-size:16px;margin:0 0 32px}
+  .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .cta{padding:11px 22px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none;display:inline-block}
+  .cta.primary{background:var(--accent);color:#06150c}
+  .cta.secondary{border:1px solid var(--border);color:var(--text)}
+  .cta.secondary:hover{border-color:var(--accent)}
+  .features{max-width:960px;margin:60px auto;padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+  .feature{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:22px}
+  .feature h3{margin:0 0 8px;font-size:15px}
+  .feature p{margin:0;color:var(--dim);font-size:13px}
+  .scope{max-width:720px;margin:60px auto;padding:0 24px}
+  .scope h3{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--dim);margin:0 0 12px}
+  .scope p{color:var(--dim);font-size:14px}
+  footer{text-align:center;color:var(--dim);font-size:12px;padding:40px 24px;border-top:1px solid var(--border);margin-top:40px}
+  footer a{color:var(--dim)}
+  footer .links{margin-bottom:8px}
+  footer .links a{margin:0 8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LEDGER</h1>
+  <nav>
+    <a href="ledger.html">Market Terminal</a>
+    <a href="item.html">Auction Tracker</a>
+    <a href="https://github.com/gamingPinguin/HypixelApiLookup" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h2>A market terminal for Hypixel Skyblock</h2>
+  <p>Ledger tracks bazaar prices, finds profitable order and craft flips, and scans the auction house for underpriced listings using true item attributes instead of display names. No account, no install — it runs in your browser.</p>
+  <div class="cta-row">
+    <a class="cta primary" href="ledger.html">Open the market terminal</a>
+    <a class="cta secondary" href="item.html">Look up an item</a>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <h3>Bazaar &amp; order flips</h3>
+    <p>Every bazaar product with live buy/sell prices and volume, plus a ranked list of profitable order flips net of the bazaar fee.</p>
+  </div>
+  <div class="feature">
+    <h3>Craft &amp; book flips</h3>
+    <p>Recipes priced against live ingredient costs, and enchanted-book combine chains detected straight from the bazaar's own product list.</p>
+  </div>
+  <div class="feature">
+    <h3>Auction snipes</h3>
+    <p>Decodes each listing's item data client-side and groups by real attributes — stars, recombobulation, enchants — so underpriced items don't hide behind a shared display name.</p>
+  </div>
+  <div class="feature">
+    <h3>Item auction tracker</h3>
+    <p>Look up any item to see live listings grouped by attribute variant, recent sales, a price history graph, and an in-game-style preview for any listing.</p>
+  </div>
+  <div class="feature">
+    <h3>NPC &amp; market trend flips</h3>
+    <p>Reverse NPC flips, plus 24 hour top movers and low-supply markets once the optional backend has been running a while.</p>
+  </div>
+  <div class="feature">
+    <h3>Runs entirely client-side</h3>
+    <p>No account, no tracking, no server required for the core app. The optional backend is something you run yourself if you want sale history.</p>
+  </div>
+</section>
+
+<section class="scope">
+  <h3>What this is, and isn't</h3>
+  <p>Ledger is a research tool. Every figure is an estimate based on current listings, not a guarantee your orders fill at the prices shown. It's an independent, non-commercial project built for the Skyblock trading community, and is not affiliated with, endorsed by, or sponsored by Hypixel Inc. or Mojang.</p>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="ledger.html">Market Terminal</a>·
+    <a href="item.html">Auction Tracker</a>·
+    <a href="privacy.html">Privacy Policy</a>·
+    <a href="https://github.com/gamingPinguin/HypixelApiLookup" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  Ledger is an independent project and is not affiliated with Hypixel Inc.
+</footer>
+
+</body>
+</html>

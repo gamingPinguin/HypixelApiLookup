@@ -208,14 +208,9 @@
   </div>
 </div>
 
+<script src="ledger-core.js"></script>
 <script>
 'use strict';
-
-const FEE = 0.0125;
-const BAZAAR_URL = 'https://api.hypixel.net/v2/skyblock/bazaar';
-const AUCTIONS_URL = 'https://api.hypixel.net/v2/skyblock/auctions';
-const ELECTION_URL = 'https://api.hypixel.net/v2/resources/skyblock/election';
-const neuItemUrl = id => `https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/items/${id}.json`;
 
 let bazaar = new Map();
 let bazaarSort = { key: 'volume', dir: -1 };
@@ -258,28 +253,6 @@ function wirePresets(containerId, stateRef, renderFn) {
       renderFn();
     });
   });
-}
-
-// ---------- helpers ----------
-function fmt(n) {
-  if (n == null || isNaN(n)) return '-';
-  const sign = n < 0 ? '-' : '';
-  n = Math.abs(n);
-  if (n >= 1e9) return sign + (n / 1e9).toFixed(2) + 'b';
-  if (n >= 1e6) return sign + (n / 1e6).toFixed(2) + 'm';
-  if (n >= 1e3) return sign + (n / 1e3).toFixed(1) + 'k';
-  return sign + n.toFixed(0);
-}
-function median(arr) {
-  const s = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-function sortRows(rows, key, dir) {
-  return [...rows].sort((a, b) => (a[key] - b[key]) * dir || String(a.name || '').localeCompare(b.name || ''));
-}
-function niceName(id) {
-  return id.replace(/_/g, ' ');
 }
 
 // ---------- tabs ----------
@@ -505,7 +478,6 @@ function renderCraft() {
 // npc_sell_price lives on Hypixel's own /resources/skyblock/items endpoint, not in the
 // NEU repo -- checked directly rather than assumed, since the NEU item JSON has no such
 // field at all. One request for every item in the game, so no per-item scanning needed.
-const ITEMS_URL = 'https://api.hypixel.net/v2/resources/skyblock/items';
 async function scanNpcFlips() {
   const btn = document.getElementById('npc-scan-btn');
   const status = document.getElementById('npc-status');
@@ -571,104 +543,6 @@ async function loadTrends() {
   }
 }
 document.querySelector('button[data-tab="tab-trends"]').addEventListener('click', loadTrends);
-
-// ---------- NBT + gzip (native platform decompression, no library) ----------
-function b64ToBytes(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-async function gunzip(bytes) {
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-class Cursor { constructor(view) { this.view = view; this.pos = 0; } }
-const readByte = c => { const v = c.view.getInt8(c.pos); c.pos += 1; return v; };
-const readUByte = c => { const v = c.view.getUint8(c.pos); c.pos += 1; return v; };
-const readShort = c => { const v = c.view.getInt16(c.pos); c.pos += 2; return v; };
-const readInt = c => { const v = c.view.getInt32(c.pos); c.pos += 4; return v; };
-const readLong = c => { const v = c.view.getBigInt64(c.pos); c.pos += 8; return Number(v); };
-const readFloat = c => { const v = c.view.getFloat32(c.pos); c.pos += 4; return v; };
-const readDouble = c => { const v = c.view.getFloat64(c.pos); c.pos += 8; return v; };
-function readString(c) {
-  const len = readShort(c) & 0xffff;
-  const bytes = new Uint8Array(c.view.buffer, c.view.byteOffset + c.pos, len);
-  c.pos += len;
-  return new TextDecoder('utf-8').decode(bytes);
-}
-function readPayload(c, type) {
-  switch (type) {
-    case 1: return readByte(c);
-    case 2: return readShort(c);
-    case 3: return readInt(c);
-    case 4: return readLong(c);
-    case 5: return readFloat(c);
-    case 6: return readDouble(c);
-    case 7: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readByte(c)); return a; }
-    case 8: return readString(c);
-    case 9: { const t = readUByte(c); const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readPayload(c, t)); return a; }
-    case 10: { const o = {}; while (true) { const t = readUByte(c); if (t === 0) break; o[readString(c)] = readPayload(c, t); } return o; }
-    case 11: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readInt(c)); return a; }
-    case 12: { const len = readInt(c); const a = []; for (let i = 0; i < len; i++) a.push(readLong(c)); return a; }
-    default: throw new Error('unknown NBT tag type ' + type);
-  }
-}
-function parseNbt(bytes) {
-  const c = new Cursor(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
-  const rootType = readUByte(c);
-  readString(c); // root name, unused
-  return readPayload(c, rootType);
-}
-async function decodeItemBytes(b64) {
-  const raw = await gunzip(b64ToBytes(b64));
-  const nbt = parseNbt(raw);
-  return nbt.i || [];
-}
-
-// ---------- fingerprint ----------
-// ponytail: pet level is grouped by tier only, not the full 20-level band from the spec.
-// The XP breakpoint table needed for exact bands is large; add it if pet snipes need finer grouping.
-function fingerprint(itemId, ea) {
-  const parts = [itemId || 'UNKNOWN'];
-  if (!ea) return parts.join('|');
-  if (ea.rarity_upgrades) parts.push('R');
-  const stars = ea.upgrade_level || ea.dungeon_item_level;
-  if (stars) parts.push('S' + stars);
-  const hpb = ea.hot_potato_count;
-  if (hpb && hpb > 10) parts.push('FPB' + (hpb - 10));
-  if (ea.enchantments) {
-    const ench = Object.entries(ea.enchantments)
-      .filter(([name, lvl]) => name.startsWith('ultimate_') || lvl >= 6)
-      .map(([name, lvl]) => `${name}${lvl}`)
-      .sort();
-    if (ench.length) parts.push(ench.join(','));
-  }
-  if (itemId === 'PET' && ea.petInfo) {
-    try {
-      const p = JSON.parse(ea.petInfo);
-      parts.push(`PET:${p.type}:${p.tier}:${p.heldItem || ''}`);
-    } catch (e) { /* malformed petInfo, skip pet-specific grouping */ }
-  }
-  if (ea.new_years_cake) parts.push('CAKE' + ea.new_years_cake);
-  if (ea.party_hat_color) parts.push('HAT' + ea.party_hat_color + (ea.party_hat_emoji || ''));
-  return parts.join('|');
-}
-
-function findSnipes(groups) {
-  const snipes = [];
-  for (const listings of groups.values()) {
-    if (listings.length < 4) continue;
-    const sorted = [...listings].sort((a, b) => a.price - b.price);
-    const cheapest = sorted[0];
-    const med = median(sorted.slice(1).map(l => l.price));
-    const gap = sorted[1].price - cheapest.price;
-    if (cheapest.price <= med * 0.8 && gap > 0) {
-      snipes.push({ cheapest, median: med, listings: sorted });
-    }
-  }
-  return snipes.sort((a, b) => (b.median - b.cheapest.price) - (a.median - a.cheapest.price));
-}
 
 // ---------- auction scan ----------
 async function scanSnipes() {

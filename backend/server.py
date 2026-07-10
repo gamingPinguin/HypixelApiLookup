@@ -16,6 +16,17 @@ DB_PATH = os.environ.get("LEDGER_DB", "/data/ledger.db")
 PORT = int(os.environ.get("PORT", "8080"))
 STATIC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# explicit allowlist, not a general file server -- avoids any path-traversal
+# surface on a server that's meant to be reachable publicly.
+STATIC_FILES = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/ledger.html": ("ledger.html", "text/html; charset=utf-8"),
+    "/item.html": ("item.html", "text/html; charset=utf-8"),
+    "/privacy.html": ("privacy.html", "text/html; charset=utf-8"),
+    "/ledger-core.js": ("ledger-core.js", "text/javascript; charset=utf-8"),
+}
+
 MOVERS_WINDOW_SECONDS = 24 * 3600
 # snapshots land every ~10 minutes; +-15 min either side of the 24h mark
 # guarantees a match without pulling in a point from a different day.
@@ -95,8 +106,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(low_supply(sqlite3.connect(DB_PATH)))
         if parsed.path == "/api/player":
             return self._player(query)
-        if parsed.path in ("/", "/ledger.html"):
-            return self._serve_file("ledger.html", "text/html; charset=utf-8")
+        if parsed.path in STATIC_FILES:
+            return self._serve_file(*STATIC_FILES[parsed.path])
         self.send_error(404)
 
     def _history(self, query):

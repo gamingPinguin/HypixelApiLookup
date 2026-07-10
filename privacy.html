@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger — Privacy Policy</title>
+<style>
+  :root{
+    --bg:#0b0e12; --panel:#12161c; --border:#232a33; --text:#d3d9e0;
+    --dim:#7a8592; --accent:#4fae74;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);margin:0;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.7}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border)}
+  header h1{font-size:15px;margin:0;letter-spacing:.06em;font-weight:700}
+  header h1 a{color:inherit;text-decoration:none}
+  header nav{margin-left:auto;display:flex;gap:20px}
+  header nav a{color:var(--dim);text-decoration:none;font-size:13px}
+  header nav a:hover{color:var(--text)}
+  main{max-width:720px;margin:0 auto;padding:40px 24px 80px}
+  h2{font-size:26px;margin:0 0 4px}
+  .updated{color:var(--dim);font-size:13px;margin:0 0 32px}
+  h3{font-size:16px;margin:32px 0 10px}
+  p, li{color:var(--text);font-size:14px}
+  ul{padding-left:20px}
+  .note{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px 16px;font-size:13px;color:var(--dim)}
+  a{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--dim);font-weight:600}
+  footer{text-align:center;color:var(--dim);font-size:12px;padding:30px 24px;border-top:1px solid var(--border)}
+  footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><a href="index.html">LEDGER</a></h1>
+  <nav>
+    <a href="ledger.html">Market Terminal</a>
+    <a href="item.html">Auction Tracker</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+
+<main>
+  <h2>Privacy Policy</h2>
+  <p class="updated">Last updated: 10 July 2026</p>
+
+  <div class="note">
+    Short version: Ledger doesn't have a server that receives, stores, or processes your personal data. It's a set of static pages that run in your browser. Your browser talks directly to a few third-party APIs to fetch public game data. No accounts, no cookies, no analytics, no tracking.
+  </div>
+
+  <h3>Who this policy is about</h3>
+  <p>Ledger (this site) is an independent, non-commercial, open-source project. It is not a company or a registered business, so it does not publish a separate legal notice (Impressum) — that requirement generally applies to commercial or business-like online services, which this is not. For privacy law purposes the person you can contact about this project is:</p>
+  <p><strong>gamingPinguin</strong> — <a href="mailto:gamingPinguin@gmx.ch">gamingPinguin@gmx.ch</a></p>
+
+  <h3>What this site does not do</h3>
+  <ul>
+    <li>No account creation, login, or user profiles</li>
+    <li>No cookies</li>
+    <li>No analytics, telemetry, or advertising trackers of any kind</li>
+    <li>No server operated by this project that logs your visits or requests</li>
+  </ul>
+  <p>The pages (<code>index.html</code>, <code>ledger.html</code>, <code>item.html</code>) are static files. When hosted, they're served as-is by the hosting provider (see "Hosting" below) — there is no application server behind them collecting information about you.</p>
+
+  <h3>What your browser does when you use Ledger</h3>
+  <p>Because there's no backend for the core app, your browser fetches data directly from a handful of third parties. Each of those services processes the request under its own privacy policy — Ledger never sees or stores this traffic.</p>
+  <table>
+    <thead><tr><th>Service</th><th>What's requested</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td>Hypixel API (api.hypixel.net)</td><td>Public bazaar, auction, item, and election data. No API key or login is used.</td><td>Automatically while using the Market Terminal or Auction Tracker</td></tr>
+      <tr><td>NotEnoughUpdates GitHub repository</td><td>Public crafting recipe data</td><td>When you scan Craft Flips or NPC Flips</td></tr>
+      <tr><td>SkyCrypt (sky.shiiyu.moe)</td><td>Nothing sent by Ledger — this is only a link you can choose to open in a new tab</td><td>Only if you click a "seller profile" link</td></tr>
+    </tbody>
+  </table>
+  <p>These requests carry the same technical information any web request does (e.g. your IP address, visible to that third party as part of normal internet routing) but Ledger itself does not receive, log, or store any of it.</p>
+
+  <h3>Local storage on your device</h3>
+  <p>The Market Terminal caches crafting recipe data in your browser's <code>localStorage</code> so it doesn't have to re-fetch it every visit. This stays on your device — it is never transmitted to Ledger or any server we operate, and you can clear it at any time through your browser's site settings.</p>
+
+  <h3>If you run the optional self-hosted backend</h3>
+  <p>Ledger includes an optional backend (<code>backend/</code> in the source repository) that you can run yourself in Docker to get sale history and cached seller name lookups. If you choose to run it:</p>
+  <ul>
+    <li>It's <strong>your</strong> server, under <strong>your</strong> control — Ledger the project does not operate, host, or have access to it or any data it stores.</li>
+    <li>It logs basic request activity (address and requested path) to its own console output, standard for any web server, and stores that log only where you run it.</li>
+    <li>It resolves auction seller UUIDs to usernames via Mojang's public session server, so your browser never has to. That lookup happens server-to-server between your backend and Mojang, and results are cached in your own local database file.</li>
+    <li>None of this is transmitted back to the Ledger project in any form.</li>
+  </ul>
+
+  <h3>Hosting</h3>
+  <p>Ledger is intended to be published on GitHub Pages. GitHub, Inc. (or GitHub B.V. for users in the EEA/UK/Switzerland) serves the static files and, like any web host, processes standard access logs (e.g. IP address, requested file, timestamp) as part of operating that infrastructure. That processing is governed by <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub's own Privacy Statement</a>, not by Ledger — the project does not receive a copy of these logs.</p>
+
+  <h3>Legal bases by region</h3>
+  <p>This section is provided for transparency, not as a substitute for legal advice.</p>
+  <ul>
+    <li><strong>EU/EEA (GDPR):</strong> Ledger does not act as a data controller for any personal data, because it does not collect, receive, or store any. Where your browser sends requests directly to third parties listed above, those services are independently responsible for their own GDPR compliance as controllers of that processing.</li>
+    <li><strong>Switzerland (revFADP/nDSG):</strong> The same applies under Swiss federal data protection law — no personal data is collected or processed by Ledger, so no controller obligations arise on our side.</li>
+    <li><strong>United States / California (CCPA/CPRA):</strong> Ledger is a personal, non-commercial project and does not meet the CCPA's thresholds for a "business." It does not sell or share personal information, because it does not collect any.</li>
+  </ul>
+
+  <h3>Children's privacy</h3>
+  <p>Ledger does not knowingly collect information from anyone, including children, because it does not collect information at all. The site is not specifically directed at children.</p>
+
+  <h3>Your rights</h3>
+  <p>Since Ledger holds no personal data about you, there is generally nothing to access, correct, or delete on our side. If you have questions about this policy, or about a specific third-party service listed above, contact <a href="mailto:gamingPinguin@gmx.ch">gamingPinguin@gmx.ch</a>.</p>
+
+  <h3>Changes to this policy</h3>
+  <p>If what the site does changes — for example, if analytics or a hosted backend were ever added — this page will be updated and the date at the top revised accordingly.</p>
+
+  <div class="note">This policy describes a non-commercial, personal open-source project in good faith. It is not legal advice. If you need certainty for your specific situation or jurisdiction, consult a qualified professional.</div>
+</main>
+
+<footer>
+  Ledger is an independent project and is not affiliated with Hypixel Inc. · <a href="index.html">Home</a>
+</footer>
+
+</body>
+</html>

@@ -1,25 +1,38 @@
 # Ledger
 
-A market data terminal for Hypixel Skyblock. Ledger tracks bazaar prices, surfaces profitable order flips and craft flips, and scans the auction house for underpriced listings using true item attributes rather than display names.
+A market data terminal for Hypixel Skyblock. Ledger tracks bazaar prices, surfaces profitable order flips and craft flips, scans the auction house for underpriced listings using true item attributes rather than display names, and includes a per-item auction tracker with price history and an in-game-style item preview.
 
-The browser release runs as a single HTML file with no build step. A small containerized backend records sale history, a capability the public Hypixel API does not provide on its own.
+The site is a handful of static HTML pages with no build step, meant to be hosted for free (e.g. GitHub Pages). A small containerized backend, run separately and optionally, records sale history — a capability the public Hypixel API does not provide on its own.
 
 ---
 
 ## Contents
 
-1. [Status](#status)
-2. [Features](#features)
-3. [How it works](#how-it-works)
-4. [Running the browser version](#running-the-browser-version)
-5. [Running the backend](#running-the-backend)
-6. [Data sources](#data-sources)
-7. [Accuracy and known limits](#accuracy-and-known-limits)
-8. [Backend service](#backend-service)
-9. [Roadmap](#roadmap)
-10. [Design direction](#design-direction)
-11. [References](#references)
-12. [Project layout](#project-layout)
+1. [Pages](#pages)
+2. [Status](#status)
+3. [Features](#features)
+4. [How it works](#how-it-works)
+5. [Running the browser version](#running-the-browser-version)
+6. [Running the backend](#running-the-backend)
+7. [Data sources](#data-sources)
+8. [Accuracy and known limits](#accuracy-and-known-limits)
+9. [Backend service](#backend-service)
+10. [Roadmap](#roadmap)
+11. [Design direction](#design-direction)
+12. [References](#references)
+13. [Privacy and legal](#privacy-and-legal)
+14. [Project layout](#project-layout)
+
+---
+
+## Pages
+
+| Page | Purpose |
+|:-----|:--------|
+| `index.html` | Landing page — what the project is, links to everything else |
+| `ledger.html` | The market terminal: bazaar, order/book/craft/NPC flips, snipes, trends |
+| `item.html` | Auction tracker for a single item — `item.html?id=HYPERION` |
+| `privacy.html` | Privacy policy (GDPR / Swiss revFADP / CCPA) |
 
 ---
 
@@ -40,7 +53,11 @@ The browser release runs as a single HTML file with no build step. A small conta
 | Top movers | Shipped | `/api/movers`, needs ~24h of collector uptime to populate |
 | Low supply | Shipped | `/api/low-supply`, reads the collector's live active-listing counts |
 | Seller name resolution | Shipped | Backend caches Mojang lookups; browser never calls Mojang directly |
-| Sale history graph | Planned | Backend records the data via `/api/history`; no chart in the browser yet |
+| Item auction tracker | Shipped | `item.html` — live listings, variant grouping, recent sales, price chart |
+| Sale history graph | Shipped | Canvas chart on `item.html`, reads `/api/history` |
+| Item preview on click | Shipped | In-game-style tooltip decoded from the listing's own NBT data |
+| Landing page | Shipped | `index.html` |
+| Privacy policy | Shipped | `privacy.html` — GDPR / Swiss revFADP / CCPA |
 
 ---
 
@@ -92,6 +109,19 @@ Two panels backed by the collector's own history: Top Movers ranks bazaar produc
 
 The header shows the current Skyblock mayor and their active perks, fetched directly from Hypixel's public election resource. This is informational only — there's no historic mayor-to-price dataset behind it, so no predictions are made from it.
 
+### Item auction tracker
+
+`item.html?id=HYPERION` gives any single item its own page, similar in spirit to SkyCofl's per-item view:
+
+- **Live listings**, decoded and grouped by the same attribute fingerprint the snipe scanner uses, so a plain item, a 5-star one, and a recombobulated one show up as separate, comparable variants instead of one blended price.
+- **Attribute variants overview** — a compact table of every variant currently listed, with count, cheapest, and median price, which is what "similar items priced the same way" means in practice: group first, compare within the group, not across it.
+- **Flagged underpriced listings**, using the same four-comparables / 20%-below-median rule as Auction Snipes, scoped to this one item.
+- **Recent activity**, pulled from Hypixel's `auctions_ended` feed (roughly the last hour, no scan required) so there's something to look at immediately.
+- **Price history chart**, drawn on a plain `<canvas>` from the backend's `/api/history` — empty until the backend has recorded at least one sale for this item.
+- **Item preview on click** — selecting any live listing opens its actual in-game tooltip: name and lore decoded straight from that listing's own NBT data and rendered with real Minecraft color codes, not a generic description.
+
+Live listings require pressing "Scan live listings," the same on-demand pattern as Auction Snipes, since finding every listing for one item still means decoding the whole auction house client-side.
+
 ---
 
 ## How it works
@@ -123,10 +153,10 @@ Every auction carries an `item_bytes` field containing the item's full attribute
 
 ## Running the browser version
 
-1. Download `ledger.html`.
-2. Open it in any modern browser.
+1. Download the whole repository (or just `index.html`, `ledger.html`, `item.html`, `privacy.html`, and `ledger-core.js` — they need to sit next to each other).
+2. Open `index.html` in any modern browser, or host the folder as-is on any static host (this is what GitHub Pages does).
 
-That is the whole process. No API key is needed. The bazaar and auction endpoints used here are public and cached upstream, so they do not require authentication.
+That is the whole process. No API key is needed. The bazaar and auction endpoints used here are public and cached upstream, so they do not require authentication. Without the backend running, everything works except sale history, movers, low supply, and seller names — those sections show a plain "backend not reachable" message instead of failing silently.
 
 ---
 
@@ -138,7 +168,7 @@ docker compose build
 docker compose up
 ```
 
-The page and the history API are both served on port 8080. Data lives in a named Docker volume, so it survives container restarts. Run the self-tests with `python backend/test_ledger.py` before building if you've changed the collector or parser.
+All four pages, `ledger-core.js`, and the API are served together on port 8080 — visiting `http://localhost:8080/` gets you the landing page, with everything else linked from there. Data lives in a named Docker volume, so it survives container restarts. Run the self-tests with `python backend/test_ledger.py` before building if you've changed the collector, parser, or server routes.
 
 ---
 
@@ -148,6 +178,7 @@ The page and the history API are both served on port 8080. Data lives in a named
 |:-------|:----|:---------------|
 | Hypixel bazaar endpoint | Live product prices and volume | None |
 | Hypixel auctions endpoint | Active Buy It Now listings | None |
+| Hypixel `auctions_ended` endpoint | Recently sold/expired auctions, for `item.html`'s recent activity feed | None |
 | Hypixel `/resources/skyblock/items` | NPC sell prices, for reverse NPC flips | None |
 | Hypixel `/resources/skyblock/election` | Current mayor and perks | None |
 | NotEnoughUpdates repository | Crafting recipes | None, fetched live and cached |
@@ -248,8 +279,8 @@ Every 10th poll cycle (about 10 minutes at the default 60 second interval) the c
 
 ### What the backend unlocks
 
-- Real sale history per item variant, served over `/api/history` — the data exists, but nothing in the browser charts it yet
-- Server side seller name resolution (`/api/player`), caching Mojang lookups that a browser cannot make directly — shipped, used by the Auction Snipes detail panel
+- Real sale history per item variant, served over `/api/history` and charted on `item.html`'s price history graph
+- Server side seller name resolution (`/api/player`), caching Mojang lookups that a browser cannot make directly — used on the Auction Snipes detail panel and throughout `item.html`
 - Bazaar price snapshots every ~10 minutes, powering the Top Movers panel (`/api/movers`) once ~24h of history exists
 - Live active-listing counts per item, powering the Low Supply panel (`/api/low-supply`)
 - Persistence across restarts, since the database lives on a mounted volume
@@ -276,12 +307,8 @@ Most of the SkyCofl-style catalog this project aims toward is now shipped, eithe
 | Top movers | Largest 24 hour bazaar price swings, up and down |
 | Low supply research | Thin markets flagged from the collector's live active-listing counts |
 | Seller name resolution | Backend-cached Mojang lookups, browser never calls Mojang directly |
-
-### Planned, real gap
-
-| Feature | Description |
-|:--------|:------------|
-| Sale history charts | The backend already serves per-variant history via `/api/history`; nothing in the browser renders it yet |
+| Item auction tracker | `item.html` — live listings, attribute-variant grouping, recent sales, price chart, item preview |
+| Landing page and privacy policy | `index.html`, `privacy.html` |
 
 ### Not implemented — no verified data source
 
@@ -327,8 +354,15 @@ The project draws on three existing tools. They are listed here as design and fe
 | Reference | Used for |
 |:----------|:---------|
 | [SkyCofl flipping hub](https://sky.coflnet.com/flips) | The catalog of flip types and how each market is framed by capital, risk, and liquidity |
+| [SkyCofl item page](https://sky.coflnet.com/item/HYPERION) | Shape of `item.html`: per-item live listings, recent sales, and price history in one view |
 | [Bazaar Tracker](https://bazaartracker.com) | Page layout, section structure, typography, and the summary stat row pattern |
 | [skyblock.finance](https://skyblock.finance/) | Icon style, flat and evenly weighted at small sizes |
+
+---
+
+## Privacy and legal
+
+`privacy.html` covers what little data processing exists (essentially none — the site is static, your browser talks to third-party APIs directly, and there's no analytics or tracking). It addresses GDPR (EU/EEA), Switzerland's revFADP, and the US CCPA/CPRA, and explains why the project doesn't publish a separate Impressum: that requirement applies to commercial or business-like services, and this is a non-commercial personal project. None of this is a substitute for actual legal advice — see the disclaimer on that page.
 
 ---
 
@@ -336,7 +370,11 @@ The project draws on three existing tools. They are listed here as design and fe
 
 ```
 ledger/
-  ledger.html            Browser terminal, self contained
+  index.html             Landing page
+  ledger.html            Market terminal
+  item.html              Per-item auction tracker
+  privacy.html           Privacy policy
+  ledger-core.js         Shared gzip/NBT decoding, fingerprinting, formatting -- used by ledger.html and item.html
   README.md              This document
 
   backend/
