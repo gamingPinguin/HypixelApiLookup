@@ -1,5 +1,5 @@
 import { React, html, createRoot, fmt, niceName, fetchBazaar, fetchJson, ITEMS_URL, getItemData } from '../lib.js';
-import { Nav, PageLayout, SearchInput, SortableTable, useSort } from '../components.js';
+import { Nav, PageLayout, SearchInput, SortableTable, useSort, RecipeModal } from '../components.js';
 
 const { useState, useEffect, useMemo } = React;
 const FEE = 0.0125;
@@ -84,7 +84,7 @@ function CraftFlips({ bazaar }) {
   const [status, setStatus] = useState('');
   const [rows, setRows] = useState([]);
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState(null);
+  const [modalRow, setModalRow] = useState(null);
   const { sortKey, sortDir, onSort, sortRows } = useSort('profit', -1);
 
   async function scan() {
@@ -126,20 +126,17 @@ function CraftFlips({ bazaar }) {
       <div class="card">
         <${SortableTable} columns=${[['name', 'Item'], ['cost', 'Cost'], ['revenue', 'Revenue'], ['profit', 'Profit']]}
           rows=${sortRows(filtered)} sortKey=${sortKey} sortDir=${sortDir} onSort=${onSort}
-          onRowClick=${r => setExpanded(expanded === r.key ? null : r.key)}
+          onRowClick=${setModalRow}
           renderCell=${(r, k) => k === 'name' ? r.name : fmt(r[k])}
           emptyMessage=${scanning ? 'Scanning…' : 'Press "Scan crafts" to find profitable recipes.'} />
-        ${expanded && (() => {
-          const r = rows.find(x => x.key === expanded);
-          if (!r) return null;
-          return html`
-            <div style=${{ padding: '14px 20px', borderTop: '1px solid var(--border)', fontSize: '13px', color: 'var(--text-2)', background: '#fcfcfd' }}>
-              ${r.slots.map(s => html`<div key=${s.id}>${s.amount}x ${niceName(s.id)} @ ${fmt(bazaar.get(s.id)?.buyPrice)}</div>`)}
-            </div>
-          `;
-        })()}
       </div>
     <//>
+    ${modalRow && html`
+      <${RecipeModal} open=${!!modalRow} onClose=${() => setModalRow(null)}
+        title=${modalRow.name} outCount=${modalRow.outCount}
+        cost=${modalRow.cost} revenue=${modalRow.revenue} profit=${modalRow.profit}
+        ingredients=${modalRow.slots.map(s => ({ id: s.id, label: niceName(s.id), amount: s.amount, unitPrice: bazaar.get(s.id)?.buyPrice || 0 }))} />
+    `}
   `;
 }
 

@@ -115,8 +115,9 @@ export function fingerprint(itemId, ea, displayName) {
   const hpb = ea.hot_potato_count;
   if (hpb && hpb > 10) parts.push('FPB' + (hpb - 10));
   if (ea.enchantments) {
+    // every enchantment counts, not just the "meaningful" high ones -- a Sharpness 5
+    // sword and a bare one are different items and shouldn't be treated as comparable.
     const ench = Object.entries(ea.enchantments)
-      .filter(([name, lvl]) => name.startsWith('ultimate_') || lvl >= 6)
       .map(([name, lvl]) => `${name}${lvl}`)
       .sort();
     if (ench.length) parts.push(ench.join(','));
@@ -153,7 +154,7 @@ export function attrSummary(ea, displayName) {
   const stars = ea.upgrade_level ?? ea.dungeon_item_level ?? 0;
   if (stars > 0) bits.push(stars + '★');
   if ((ea.hot_potato_count || 0) > 10) bits.push('+' + (ea.hot_potato_count - 10) + ' fuming');
-  const ench = Object.entries(ea.enchantments || {}).filter(([n, l]) => l >= 6 || n.startsWith('ultimate_'));
+  const ench = Object.entries(ea.enchantments || {}).sort((a, b) => b[1] - a[1]);
   if (ench.length) bits.push(
     ench.slice(0, 3).map(([n, l]) => n.replace('ultimate_', 'U. ').replace(/_/g, ' ') + ' ' + l).join(', ')
     + (ench.length > 3 ? ` +${ench.length - 3} more` : ''));

@@ -82,11 +82,14 @@ def reconcile(conn, current_listings, now_ts):
             continue
         try:
             items = decode_item_bytes(listing["item_bytes"])
-            ea = (items[0].get("tag") or {}).get("ExtraAttributes") if items else None
+            tag = (items[0].get("tag") or {}) if items else {}
+            ea = tag.get("ExtraAttributes")
+            display_name = (tag.get("display") or {}).get("Name")
         except Exception:
             ea = None
+            display_name = None
         item_id = (ea or {}).get("id") or listing.get("item_name")
-        fp = fingerprint(item_id, ea)
+        fp = fingerprint(item_id, ea, display_name)
         conn.execute(
             "INSERT INTO active (auction_uuid, item_id, fingerprint, price, end_ts, last_seen) "
             "VALUES (?,?,?,?,?,?)",

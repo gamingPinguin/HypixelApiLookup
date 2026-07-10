@@ -1,12 +1,13 @@
 """Minimal big-endian NBT reader and item fingerprinting.
 
-Mirrors the parser in ledger.html so the backend groups auctions into the
+Mirrors the parser in src/lib.js so the backend groups auctions into the
 same variants the browser does. Stdlib only (struct, gzip, base64) -- no
 pynbt/nbtlib dependency for a format this small.
 """
 import base64
 import gzip
 import json
+import re
 import struct
 
 
@@ -120,11 +121,13 @@ def decode_item_bytes(b64):
     return parse_nbt(raw).get("i", [])
 
 
-# ponytail: pet level is grouped by tier only, not the full 20-level band the
-# README describes. The XP breakpoint table needed for exact bands is large;
-# add it if pet snipes need finer grouping. Kept identical to the JS version
-# in ledger.html so both sides group auctions into the same variants.
-def fingerprint(item_id, ea):
+# Kept identical to the JS version in src/lib.js so both sides group auctions
+# into the same variants -- this is what lets /api/history correlate backend
+# sale records with fingerprints the frontend computes independently.
+_LEVEL_RE = re.compile(r"\[Lvl (\d+)\]")
+
+
+def fingerprint(item_id, ea, display_name=None):
     parts = [item_id or "UNKNOWN"]
     if not ea:
         return parts[0]
@@ -138,16 +141,17 @@ def fingerprint(item_id, ea):
         parts.append(f"FPB{hpb - 10}")
     ench = ea.get("enchantments")
     if ench:
-        entries = sorted(
-            f"{name}{lvl}" for name, lvl in ench.items()
-            if name.startswith("ultimate_") or lvl >= 6
-        )
+        # every enchantment counts, not just the "meaningful" high ones -- a Sharpness 5
+        # sword and a bare one are different items and shouldn't be treated as comparable.
+        entries = sorted(f"{name}{lvl}" for name, lvl in ench.items())
         if entries:
             parts.append(",".join(entries))
     if item_id == "PET" and ea.get("petInfo"):
         try:
             p = json.loads(ea["petInfo"])
-            parts.append(f"PET:{p.get('type')}:{p.get('tier')}:{p.get('heldItem', '')}")
+            m = _LEVEL_RE.search(display_name or "")
+            band = (int(m.group(1)) // 20 * 20) if m else 0
+            parts.append(f"PET:{p.get('type')}:{p.get('tier')}:{band}:{p.get('heldItem', '')}")
         except (json.JSONDecodeError, TypeError):
             pass
     if ea.get("new_years_cake"):

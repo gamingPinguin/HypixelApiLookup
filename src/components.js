@@ -1,4 +1,4 @@
-import { React, html } from './lib.js';
+import { React, html, fmt } from './lib.js';
 const { useState } = React;
 
 export function Nav({ active }) {
@@ -155,5 +155,40 @@ export function Modal({ open, onClose, children }) {
     <div class=${'modal-overlay' + (open ? ' open' : '')} onClick=${e => { if (e.target === e.currentTarget) onClose(); }}>
       <div class="modal-panel">${children}</div>
     </div>
+  `;
+}
+
+// Generic "what does this flip actually involve" detail: used by Craft Flips and
+// Shard Flips. ingredients: [{ id, label, amount, unitPrice }] -- subtotal is derived.
+export function RecipeModal({ open, onClose, title, subtitle, outCount, cost, revenue, profit, ingredients }) {
+  return html`
+    <${Modal} open=${open} onClose=${onClose}>
+      <div class="modal-head">
+        <div>
+          <h2>${title}</h2>
+          <div class="modal-attrs">${subtitle || (outCount > 1 ? `Yields ${outCount}x per craft` : '')}</div>
+        </div>
+        <button class="modal-x" onClick=${onClose} aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-grid" style=${{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div class="modal-metric"><span>Cost</span><b>${fmt(cost)}</b></div>
+        <div class="modal-metric"><span>Revenue</span><b>${fmt(revenue)}</b></div>
+        <div class="modal-metric"><span>Profit</span><b style=${{ color: 'var(--up)' }}>${fmt(profit)}</b></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-label">${ingredients.length} ingredient${ingredients.length === 1 ? '' : 's'} needed</div>
+        <table class="listings-table"><tbody>
+          ${ingredients.map(ing => html`
+            <tr key=${ing.id}>
+              <td style=${{ textAlign: 'left' }}>${ing.amount}x ${ing.label}</td>
+              <td class="num" style=${{ color: 'var(--text-3)' }}>@ ${fmt(ing.unitPrice)}</td>
+              <td class="num" style=${{ textAlign: 'right', fontWeight: 600 }}>${fmt(ing.unitPrice * ing.amount)}</td>
+            </tr>
+          `)}
+        </tbody></table>
+      </div>
+    <//>
   `;
 }

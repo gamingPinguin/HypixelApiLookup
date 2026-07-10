@@ -29,6 +29,21 @@ def test_fingerprint_matches_js_cases():
     assert fingerprint("HYPERION", None) == "HYPERION"
 
 
+def test_fingerprint_includes_low_level_enchants():
+    # a Sharpness 5 sword and a bare one are different items, even though 5 is
+    # below the old "meaningful" threshold of 6 -- both must fingerprint distinctly.
+    plain = fingerprint("HYPERION", {})
+    enchanted = fingerprint("HYPERION", {"enchantments": {"sharpness": 5}})
+    assert plain != enchanted
+    assert "sharpness5" in enchanted
+
+
+def test_fingerprint_pet_level_band_matches_js():
+    ea = {"petInfo": '{"type": "ENDERMAN", "tier": "LEGENDARY"}'}
+    fp = fingerprint("PET", ea, display_name="[Lvl 47] Enderman")
+    assert "PET:ENDERMAN:LEGENDARY:40:" in fp
+
+
 def _listing(uuid, item_id="COAL", price=1000, end_ts=10_000, bytes_ok=True):
     ea_bytes = bytes([10, 0, 0, 0])  # empty compound
     b64 = base64.b64encode(gzip.compress(ea_bytes)).decode() if bytes_ok else "not-base64"
