@@ -240,10 +240,13 @@ On each poll the collector loads the known active set, fetches the current set f
 
 | Endpoint | Returns |
 |:---------|:--------|
-| `/api/history?fingerprint=X` | Up to 500 most recent recorded sales for a fingerprint |
+| `/api/history?fingerprint=X` | Up to 500 most recent recorded auction sales for a fingerprint (Auction Tracker's price chart) |
+| `/api/bazaar-history?product=X` | Up to 500 most recent bazaar price snapshots for a product (Bazaar Tracker's price chart) |
 | `/api/movers` | Bazaar products ranked by 24h price change |
 | `/api/low-supply` | Items with very few active listings right now |
 | `/api/player?uuid=X` | Cached Mojang username for an auction seller |
+
+`/api/history` and `/api/bazaar-history` look similar but read different tables and serve different pages: auction items (Hyperion, pets, etc.) only ever get sold via the auction house, so their price history lives in `sales`; bazaar products (Sea Lumies, Enchanted Coal, etc.) trade through the bazaar's own order book, not the auction house, so their price history is the periodic `bazaar_snapshots` instead. Passing a bazaar product id to `/api/history` would silently return nothing, since that item essentially never appears in real auction sales under a plain fingerprint.
 
 ---
 

@@ -1,4 +1,4 @@
-import { React, html, createRoot, fmt, niceName, fetchBazaar, fetchHistory } from '../lib.js';
+import { React, html, createRoot, fmt, niceName, fetchBazaar, fetchBazaarHistory } from '../lib.js';
 import { Nav, PageLayout, SearchInput, Chart } from '../components.js';
 
 const { useState, useEffect, useMemo } = React;
@@ -77,7 +77,7 @@ function ProductView({ id, bazaar }) {
 
   useEffect(() => {
     let stop = false;
-    fetchHistory(id).then(rows => { if (!stop) setHistory(rows); })
+    fetchBazaarHistory(id).then(rows => { if (!stop) setHistory(rows); })
       .catch(() => { if (!stop) setHistoryError(true); });
     return () => { stop = true; };
   }, [id]);
@@ -93,8 +93,12 @@ function ProductView({ id, bazaar }) {
     { label: 'Sell Orders', value: s.sellOrders ?? '-' },
   ];
 
-  const series = history && history.length
-    ? [{ label: 'Sale price', color: '#2f5ce5', points: history.slice().reverse().map(r => ({ y: r.price })) }]
+  const chronological = history ? history.slice().reverse() : [];
+  const series = chronological.length
+    ? [
+        { label: 'Buy Price', color: '#2f5ce5', points: chronological.map(r => ({ y: r.buy_price })) },
+        { label: 'Sell Price', color: '#067647', points: chronological.map(r => ({ y: r.sell_price })) },
+      ]
     : [];
 
   return html`
@@ -103,8 +107,8 @@ function ProductView({ id, bazaar }) {
       <div class="chart-card" style=${{ marginBottom: '20px' }}>
         <div class="modal-label">Price history</div>
         ${history === null && !historyError && html`<div class="empty" style=${{ padding: '24px' }}>Loading…</div>`}
-        ${historyError && html`<div class="empty" style=${{ padding: '24px' }}>Backend not reachable — sale history needs the optional backend running.</div>`}
-        ${history && !history.length && html`<div class="empty" style=${{ padding: '24px' }}>No recorded sales yet for this product.</div>`}
+        ${historyError && html`<div class="empty" style=${{ padding: '24px' }}>Backend not reachable — price history needs the optional backend running.</div>`}
+        ${history && !history.length && html`<div class="empty" style=${{ padding: '24px' }}>No snapshots recorded yet for this product — the backend snapshots bazaar prices roughly every 10 minutes, so a new deployment needs a little time before this fills in.</div>`}
         ${series.length > 0 && html`<${Chart} series=${series} formatY=${fmt} />`}
       </div>
 

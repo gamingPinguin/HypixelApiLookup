@@ -8,7 +8,7 @@ import sqlite3
 from nbt import decode_item_bytes, fingerprint, parse_nbt
 from collector import EXPIRY_SLACK_SECONDS, init_db, reconcile, record_bazaar_snapshot
 import server
-from server import low_supply, resolve_player, top_movers
+from server import bazaar_history, low_supply, resolve_player, top_movers
 
 
 def test_nbt_roundtrip():
@@ -112,6 +112,23 @@ def test_top_movers_empty_without_day_old_data():
     init_db(conn)
     record_bazaar_snapshot(conn, {"COAL": {"quick_status": {"buyPrice": 10, "sellPrice": 100}}}, now_ts=0)
     assert top_movers(conn, now_ts=0) == []
+
+
+def test_bazaar_history_returns_newest_first_for_the_requested_product():
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    record_bazaar_snapshot(conn, {
+        "COAL": {"quick_status": {"buyPrice": 10, "sellPrice": 8}},
+        "IRON_INGOT": {"quick_status": {"buyPrice": 20, "sellPrice": 18}},
+    }, now_ts=0)
+    record_bazaar_snapshot(conn, {"COAL": {"quick_status": {"buyPrice": 12, "sellPrice": 9}}}, now_ts=100)
+
+    rows = bazaar_history(conn, "COAL")
+    assert [r["ts"] for r in rows] == [100, 0]
+    assert rows[0]["sell_price"] == 9
+
+    assert len(bazaar_history(conn, "IRON_INGOT")) == 1
+    assert bazaar_history(conn, "NONEXISTENT") == []
 
 
 def test_low_supply_filters_by_threshold():

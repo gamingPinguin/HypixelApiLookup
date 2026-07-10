@@ -292,6 +292,14 @@ export async function fetchHistory(fingerprintKey) {
   if (!res.ok) throw new Error('backend unreachable');
   return res.json();
 }
+// bazaar price history is a distinct table (bazaar_snapshots) from auction sale
+// history (sales) -- a bazaar product's "fingerprint" as a plain auction item would
+// almost never match real auction sales, so this needs its own endpoint.
+export async function fetchBazaarHistory(productId) {
+  const res = await fetch(`/api/bazaar-history?product=${encodeURIComponent(productId)}`);
+  if (!res.ok) throw new Error('backend unreachable');
+  return res.json();
+}
 export async function fetchMovers() {
   const res = await fetch('/api/movers');
   if (!res.ok) throw new Error('backend unreachable');

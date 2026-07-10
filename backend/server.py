@@ -84,6 +84,15 @@ def top_movers(conn, now_ts, limit=20):
     return movers[:limit]
 
 
+def bazaar_history(conn, product_id, limit=500):
+    rows = conn.execute(
+        "SELECT ts, buy_price, sell_price FROM bazaar_snapshots WHERE product_id=? "
+        "ORDER BY ts DESC LIMIT ?",
+        (product_id, limit),
+    ).fetchall()
+    return [{"ts": ts, "buy_price": b, "sell_price": s} for ts, b, s in rows]
+
+
 def low_supply(conn, limit=30):
     rows = conn.execute(
         "SELECT item_id, COUNT(*) AS n, MIN(price) AS min_price FROM active "
@@ -120,6 +129,8 @@ class Handler(BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         if parsed.path == "/api/history":
             return self._history(query)
+        if parsed.path == "/api/bazaar-history":
+            return self._bazaar_history(query)
         if parsed.path == "/api/movers":
             return self._send_json(top_movers(sqlite3.connect(DB_PATH), int(time.time())))
         if parsed.path == "/api/low-supply":
@@ -143,6 +154,16 @@ class Handler(BaseHTTPRequestHandler):
         ).fetchall()
         conn.close()
         self._send_json([{"price": p, "sold_at": t} for p, t in rows])
+
+    def _bazaar_history(self, query):
+        product_id = (query.get("product") or [None])[0]
+        if not product_id:
+            self.send_error(400, "product query param required")
+            return
+        conn = sqlite3.connect(DB_PATH)
+        rows = bazaar_history(conn, product_id)
+        conn.close()
+        self._send_json(rows)
 
     def _player(self, query):
         uuid = (query.get("uuid") or [None])[0]
