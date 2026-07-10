@@ -5,21 +5,96 @@ warrant a framework.
 import json
 import os
 import sqlite3
+import time
+import urllib.error
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from collector import init_db
+from collector import fetch_json, init_db
 
 DB_PATH = os.environ.get("LEDGER_DB", "/data/ledger.db")
 PORT = int(os.environ.get("PORT", "8080"))
 STATIC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+MOVERS_WINDOW_SECONDS = 24 * 3600
+# snapshots land every ~10 minutes; +-15 min either side of the 24h mark
+# guarantees a match without pulling in a point from a different day.
+MOVERS_TOLERANCE_SECONDS = 900
+LOW_SUPPLY_MAX_LISTINGS = 3
+PLAYER_CACHE_TTL_SECONDS = 30 * 24 * 3600
+MOJANG_PROFILE_URL = "https://sessionserver.mojang.com/session/minecraft/profile/{}"
+
+
+def top_movers(conn, now_ts, limit=20):
+    latest = dict(conn.execute(
+        "SELECT product_id, sell_price FROM bazaar_snapshots "
+        "WHERE ts = (SELECT MAX(ts) FROM bazaar_snapshots)"
+    ).fetchall())
+    target = now_ts - MOVERS_WINDOW_SECONDS
+    day_ago_rows = conn.execute(
+        "SELECT product_id, sell_price, ts FROM bazaar_snapshots "
+        "WHERE ts BETWEEN ? AND ?",
+        (target - MOVERS_TOLERANCE_SECONDS, target + MOVERS_TOLERANCE_SECONDS),
+    ).fetchall()
+    day_ago = {}
+    for product_id, price, ts in day_ago_rows:
+        # multiple snapshots can land in the tolerance window; keep the closest to target.
+        if product_id not in day_ago or abs(ts - target) < abs(day_ago[product_id][1] - target):
+            day_ago[product_id] = (price, ts)
+
+    movers = []
+    for product_id, old_price in ((k, v[0]) for k, v in day_ago.items()):
+        new_price = latest.get(product_id)
+        if new_price is None or not old_price:
+            continue
+        pct = (new_price - old_price) / old_price * 100
+        movers.append({"item_id": product_id, "old_price": old_price, "new_price": new_price, "pct_change": pct})
+    movers.sort(key=lambda m: abs(m["pct_change"]), reverse=True)
+    return movers[:limit]
+
+
+def low_supply(conn, limit=30):
+    rows = conn.execute(
+        "SELECT item_id, COUNT(*) AS n, MIN(price) AS min_price FROM active "
+        "GROUP BY item_id HAVING n <= ? ORDER BY n ASC, min_price DESC LIMIT ?",
+        (LOW_SUPPLY_MAX_LISTINGS, limit),
+    ).fetchall()
+    return [{"item_id": r[0], "listings": r[1], "min_price": r[2]} for r in rows]
+
+
+def resolve_player(conn, uuid):
+    row = conn.execute("SELECT name, cached_at FROM players WHERE uuid=?", (uuid,)).fetchone()
+    now_ts = int(time.time())
+    if row and now_ts - row[1] < PLAYER_CACHE_TTL_SECONDS:
+        return row[0]
+    try:
+        data = fetch_json(MOJANG_PROFILE_URL.format(uuid))
+        name = data.get("name")
+    except urllib.error.HTTPError:
+        name = None
+    except Exception:
+        return row[0] if row else None  # network hiccup: serve stale cache over nothing
+    conn.execute(
+        "INSERT INTO players (uuid, name, cached_at) VALUES (?,?,?) "
+        "ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, cached_at=excluded.cached_at",
+        (uuid, name, now_ts),
+    )
+    conn.commit()
+    return name
+
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        query = urllib.parse.parse_qs(parsed.query)
         if parsed.path == "/api/history":
-            return self._history(urllib.parse.parse_qs(parsed.query))
+            return self._history(query)
+        if parsed.path == "/api/movers":
+            return self._send_json(top_movers(sqlite3.connect(DB_PATH), int(time.time())))
+        if parsed.path == "/api/low-supply":
+            return self._send_json(low_supply(sqlite3.connect(DB_PATH)))
+        if parsed.path == "/api/player":
+            return self._player(query)
         if parsed.path in ("/", "/ledger.html"):
             return self._serve_file("ledger.html", "text/html; charset=utf-8")
         self.send_error(404)
@@ -36,6 +111,16 @@ class Handler(BaseHTTPRequestHandler):
         ).fetchall()
         conn.close()
         self._send_json([{"price": p, "sold_at": t} for p, t in rows])
+
+    def _player(self, query):
+        uuid = (query.get("uuid") or [None])[0]
+        if not uuid:
+            self.send_error(400, "uuid query param required")
+            return
+        conn = sqlite3.connect(DB_PATH)
+        name = resolve_player(conn, uuid)
+        conn.close()
+        self._send_json({"uuid": uuid, "name": name})
 
     def _send_json(self, obj):
         body = json.dumps(obj).encode("utf-8")

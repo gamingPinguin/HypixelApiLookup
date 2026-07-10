@@ -27,13 +27,20 @@ The browser release runs as a single HTML file with no build step. A small conta
 
 | Component | State | Notes |
 |:----------|:------|:------|
-| Bazaar viewer | Shipped | Live order book, sortable |
-| Order flip finder | Shipped | Margin net of fees, volume weighted |
+| Bazaar viewer | Shipped | Live order book, sortable, preset "top demand" / "top spread" sorts |
+| Order flip finder | Shipped | Margin net of fees, volume weighted, preset sorts by score/coins/percent |
 | Craft flip finder | Shipped | Recipes fetched live from the NEU repo, cached in the browser |
-| Auction snipe scanner | Shipped | Attribute aware, decodes item NBT |
-| Backend collector and API | Shipped | Records BIN sales, containerized, `/api/history` endpoint |
-| Sale history graph | Planned | Backend records the data; no chart in the browser yet |
-| Seller name resolution | Planned | Requires server side lookup |
+| Book flip finder | Shipped | Enchant chains derived from bazaar product ids, no static table |
+| Auction snipe scanner | Shipped | Attribute aware, decodes item NBT, includes full listing search |
+| Reverse NPC flips | Shipped | Uses Hypixel's own `npc_sell_price` resource, not a guessed value |
+| Forward NPC flips | Not implemented | No verified live source for NPC purchase prices — not guessed |
+| Kat / Forge / Attribute-fusion flips | Not implemented | Need large static cost tables with no verified live source — not guessed |
+| Mayor widget | Shipped | Current mayor and perks, live from Hypixel's election resource |
+| Backend collector and API | Shipped | Records BIN sales and bazaar price history, containerized |
+| Top movers | Shipped | `/api/movers`, needs ~24h of collector uptime to populate |
+| Low supply | Shipped | `/api/low-supply`, reads the collector's live active-listing counts |
+| Seller name resolution | Shipped | Backend caches Mojang lookups; browser never calls Mojang directly |
+| Sale history graph | Planned | Backend records the data via `/api/history`; no chart in the browser yet |
 
 ---
 
@@ -67,7 +74,23 @@ The scanner pulls every active Buy It Now listing, decodes each item's binary at
 
 Reforges are deliberately excluded, since they are cheap to reapply and do not meaningfully change an item's resale value.
 
-A listing is flagged as a snipe only when its variant has at least four comparable listings, the price sits at least twenty percent below the median of the other listings, and there is a real coin gap above the next cheapest listing. Selecting a snipe opens a detail panel showing a price breakdown of every listing for that variant and a link to each seller's profile.
+A listing is flagged as a snipe only when its variant has at least four comparable listings, the price sits at least twenty percent below the median of the other listings, and there is a real coin gap above the next cheapest listing. Selecting a snipe opens a detail panel showing a price breakdown of every listing for that variant and a link to each seller's profile. A search box on the same tab shows every live listing for an item, not only flagged deals. When the backend is reachable, seller UUIDs in the detail panel resolve to usernames instead of showing raw links.
+
+### Book flips
+
+Enchanted books combine two of the same enchantment and level into one book a level higher. Ledger detects the whole chain directly from bazaar product ids (`ENCHANTMENT_<NAME>_<LEVEL>`) rather than a hand-written table of enchantments, so it keeps working as new tiers are added to the game. The small anvil coin cost isn't included in the profit shown.
+
+### NPC flips
+
+Reverse NPC flips buy an item from other players at the bazaar's instant-buy price, then sell it straight to an NPC vendor for more than the bazaar currently pays. This uses Hypixel's own `npc_sell_price` field from the `/resources/skyblock/items` endpoint — not the NEU repo, which doesn't carry that field at all. Forward NPC flips (buying from a vendor to resell) aren't shown, because there's no verified live source for NPC purchase prices to check against.
+
+### Market trends
+
+Two panels backed by the collector's own history: Top Movers ranks bazaar products by 24 hour price change, and Low Supply surfaces items with very few active Buy It Now listings right now. Both need the backend running; Top Movers specifically needs about a day of uptime before it has anything to compare against.
+
+### Mayor
+
+The header shows the current Skyblock mayor and their active perks, fetched directly from Hypixel's public election resource. This is informational only — there's no historic mayor-to-price dataset behind it, so no predictions are made from it.
 
 ---
 
@@ -81,10 +104,13 @@ Browser (Ledger single file)
   |-- fetch bazaar          --> Hypixel API  (refreshed every 60s)
   |-- fetch auction pages   --> Hypixel API  (on demand scan)
   |-- fetch recipes         --> NEU repo     (on demand, cached in localStorage)
+  |-- fetch item resources  --> Hypixel API  (NPC sell prices, on demand)
+  |-- fetch election        --> Hypixel API  (mayor widget, on load)
+  |-- fetch movers/low-supply/history/player --> backend API (if reachable)
   |
   |-- decode item_bytes     --> gzip + base64 + NBT parse, in browser
   |-- fingerprint items     --> attribute based grouping
-  |-- compute flips, crafts, snipes
+  |-- compute flips, crafts, book flips, NPC flips, snipes
   |
   '-- render tables and detail panels
 ```
@@ -122,7 +148,10 @@ The page and the history API are both served on port 8080. Data lives in a named
 |:-------|:----|:---------------|
 | Hypixel bazaar endpoint | Live product prices and volume | None |
 | Hypixel auctions endpoint | Active Buy It Now listings | None |
+| Hypixel `/resources/skyblock/items` | NPC sell prices, for reverse NPC flips | None |
+| Hypixel `/resources/skyblock/election` | Current mayor and perks | None |
 | NotEnoughUpdates repository | Crafting recipes | None, fetched live and cached |
+| Mojang session server | Seller UUID to username | None, called by the backend only |
 | SkyCrypt | Seller profile links | None, opened in a new tab |
 
 The Hypixel endpoints are cached on Hypixel's side and refresh roughly once per minute. Requesting them more often than that returns identical data, so the refresh interval is set to sixty seconds to match.
@@ -135,7 +164,7 @@ Ledger is a research tool. Every figure it shows is an estimate based on current
 
 Specific limits worth understanding:
 
-**Craft flips** only cover recipes where every ingredient trades on the bazaar. Recipes that require auction only items, non tradeable items, or NPC purchases are excluded. Profit assumes ingredients are bought at instant buy, so patient buy orders will do better than the figures shown.
+**Craft flips, book flips, and NPC flips** only cover recipes and items where every price involved is a real, non-zero bazaar price. A bazaar buy or sell price of 0 means no orders currently exist on that side of the book, not a free ingredient or a free sale — those cases are filtered out rather than shown as impossible-looking guaranteed profit. Craft flips only cover recipes where every ingredient trades on the bazaar; recipes that require auction only items, non tradeable items, or NPC purchases are excluded. Profit assumes ingredients are bought at instant buy, so patient buy orders will do better than the figures shown.
 
 **Snipe fingerprints** do not yet account for gemstone slots, attribute shards, or dungeon drill components. Each of these carries its own value and would need its own pricing table. Pets are grouped by type and tier only, not by exact level, so two pets of the same tier are treated as equivalent even when their levels differ.
 
@@ -195,14 +224,34 @@ CREATE TABLE active (
   end_ts       INTEGER,
   last_seen    INTEGER
 );
+
+-- periodic bazaar price snapshots, for the top movers 24h change endpoint
+CREATE TABLE bazaar_snapshots (
+  ts         INTEGER,
+  product_id TEXT,
+  buy_price  REAL,
+  sell_price REAL
+);
+CREATE INDEX idx_snap_product_ts ON bazaar_snapshots (product_id, ts);
+
+-- Mojang UUID -> username cache, so the browser never calls Mojang directly
+CREATE TABLE players (
+  uuid      TEXT PRIMARY KEY,
+  name      TEXT,
+  cached_at INTEGER
+);
 ```
 
 On each poll the collector loads the known active set from the database, fetches the current set from the API, and reconciles the two. New identifiers are inserted. Identifiers still present have their last seen time updated. Identifiers that are now missing are classified as sold or expired and handled accordingly. A failed or partial fetch skips the whole reconcile cycle rather than risk marking every active listing as sold.
 
+Every 10th poll cycle (about 10 minutes at the default 60 second interval) the collector also snapshots every bazaar product's buy and sell price, and prunes snapshots older than 48 hours. This is deliberately less frequent than the auction poll — a snapshot every 10 minutes is dense enough to find a point close to 24 hours ago, without growing the database by the full product count on every single cycle.
+
 ### What the backend unlocks
 
-- Real sale history per item variant, and therefore a price chart that shows whether an item is actually selling
-- Server side seller name resolution, caching Mojang lookups that a browser cannot make directly
+- Real sale history per item variant, served over `/api/history` — the data exists, but nothing in the browser charts it yet
+- Server side seller name resolution (`/api/player`), caching Mojang lookups that a browser cannot make directly — shipped, used by the Auction Snipes detail panel
+- Bazaar price snapshots every ~10 minutes, powering the Top Movers panel (`/api/movers`) once ~24h of history exists
+- Live active-listing counts per item, powering the Low Supply panel (`/api/low-supply`)
 - Persistence across restarts, since the database lives on a mounted volume
 - The option to run continuously without a browser tab open
 
@@ -210,46 +259,41 @@ On each poll the collector loads the known active set from the database, fetches
 
 ## Roadmap
 
-The four tabs shipped today cover the core liquid strategies, and the backend now records sale history even though nothing in the browser reads it yet. The list below is the fuller catalog of flip types the project aims toward, modeled on the range offered by SkyCofl. Each is a distinct market with its own data needs, so they are staged by how much new infrastructure they require.
+Most of the SkyCofl-style catalog this project aims toward is now shipped, either in the browser file alone or backed by the collector. What's left splits into one real gap and a set of features deliberately left unbuilt.
 
 ### Shipped
 
 | Feature | Description |
 |:--------|:------------|
-| Bazaar viewer | Live order book across all products |
-| Order flips | Buy order to sell offer, net of fees, volume weighted |
+| Bazaar viewer | Live order book across all products, preset top-demand / top-spread sorts |
+| Order flips | Buy order to sell offer, net of fees, volume weighted, preset sorts |
 | Craft flips | Buy ingredients, craft, sell, ranked by profit |
-| Auction snipes | Attribute aware underpriced listing detection |
-| Backend collector and history API | Sale detection, SQLite storage, `/api/history` endpoint |
-
-### Planned, browser only
-
-These need no backend, only more logic in the existing file.
-
-| Feature | Description |
-|:--------|:------------|
-| Full listing search | Look up any item and see every live listing, not only flagged deals |
-| Top margins by coins | Highest absolute profit gap across the bazaar |
-| Top margins by percent | Highest percentage profit gap |
-| Top demand | Items ranked by sell volume |
-| NPC flips | Buy from a vendor, sell to the bazaar or auction house |
+| Book flips | Combine enchantment books to a higher level and resell, self-detected from bazaar ids |
+| Auction snipes | Attribute aware underpriced listing detection, plus full listing search |
 | Reverse NPC flips | Buy below vendor value from players, sell to the vendor |
-| Book flips | Combine enchantment books to a higher level and resell |
+| Mayor widget | Current mayor and active perks |
+| Backend collector and history API | Sale detection, bazaar price history, SQLite storage |
+| Top movers | Largest 24 hour bazaar price swings, up and down |
+| Low supply research | Thin markets flagged from the collector's live active-listing counts |
+| Seller name resolution | Backend-cached Mojang lookups, browser never calls Mojang directly |
 
-### Planned, backend required
-
-These depend on the collector recording data over time.
+### Planned, real gap
 
 | Feature | Description |
 |:--------|:------------|
-| Sale history charts | Per variant price history, so you can see whether an item actually sells |
-| Top movers | Largest 24 hour price swings, up and down |
-| Low supply research | Thin markets flagged before you chase a niche item |
-| Seller name resolution | Server side Mojang lookups, cached |
-| Mayor flips | Event driven predictions based on historic mayor term pricing |
-| Kat flips | Profitable pet upgrades through the Kat NPC |
-| Forge flips | Dwarven forge recipes with cooldown tracking |
-| Attribute and fusion flips | Shard combination opportunities |
+| Sale history charts | The backend already serves per-variant history via `/api/history`; nothing in the browser renders it yet |
+
+### Not implemented — no verified data source
+
+These would need either fabricated numbers or a data source that doesn't appear to exist publicly. Rather than guess values people might trade real coins against, they're left out — happy to revisit any of these if a verified source turns up.
+
+| Feature | Description | Blocker |
+|:--------|:------------|:--------|
+| Forward NPC flips | Buy from a vendor, sell to the bazaar or auction house | No live source for NPC purchase (vendor buy) prices |
+| Kat flips | Profitable pet upgrades through the Kat NPC | No verified source for the ~100+ pet upgrade cost table |
+| Forge flips | Dwarven forge recipes with cooldown tracking | No verified source for forge recipe costs and durations |
+| Attribute and fusion flips | Shard combination opportunities | No verified source for fusion recipe data |
+| Mayor-based price predictions | Event driven predictions based on historic mayor term pricing | No historic price dataset correlated to past elections; the mayor widget shows the current mayor only |
 
 ---
 
@@ -296,11 +340,11 @@ ledger/
   README.md              This document
 
   backend/
-    collector.py         Polls the API and records sales
-    server.py             Serves the page and history endpoints
+    collector.py        Polls the API, records sales, snapshots bazaar prices
+    server.py            Serves the page and the history/movers/low-supply/player endpoints
     nbt.py                Shared gzip/NBT decoding and fingerprinting
     schema.sql            Database definition
-    test_ledger.py        Self-tests for the parser and sale/expiry logic
+    test_ledger.py        Self-tests for the parser, sale/expiry logic, and endpoints
     Dockerfile
     docker-compose.yml
 ```
